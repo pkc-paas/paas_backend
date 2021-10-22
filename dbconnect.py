@@ -19,15 +19,19 @@ dbcreds = {
     'DB_UID': os.environ.get('DB_UID',''),
     'DB_PWD': os.environ.get('DB_PWD','')
 }
+
+assert (dbcreds['DB_SERVER'] and dbcreds['DB_SERVER'] !=''), "DB credentials not loaded"
+
 if absPath.startswith('/root/'):
     cf.logmessage('running on server so localhost')
-    creds['host'] = 'localhost'
+    dbcreds['DB_SERVER'] = 'localhost'
     
 tsql1 = time.time()
-conn_str = f"mysql+pymysql://{creds['DB_UID']}:{creds['DB_PWD']}@{creds['DB_SERVER']}/{creds['DB_DATABASE']}"
+conn_str = f"mysql+pymysql://{dbcreds['DB_UID']}:{dbcreds['DB_PWD']}@{dbcreds['DB_SERVER']}/{dbcreds['DB_DATABASE']}"
 sqlEngine = sqlalchemy.create_engine(conn_str,echo=False, pool_recycle=1)
 tsql2 = time.time()
 cf.logmessage(f"Connected to SQL in {round(tsql2-tsql1,3)} secs")
+
 
 # Generic SQL query handling functions
 
