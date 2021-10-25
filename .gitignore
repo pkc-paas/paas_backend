@@ -1,4 +1,5 @@
 __pycache__
 logs
 local_launch.sh
+paas_server_launch.sh
 photos

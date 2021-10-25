@@ -15,7 +15,7 @@ class saplingReq(BaseModel):
     criteria: Optional[str] = None
 
 @app.post("/getSaplings")
-def getData1(r: saplingReq, x_access_key: Optional[str] = Header(None)):
+def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage(x_access_key)
     s1 = f"select username, role from users where token='{x_access_key}'"
     user = dbconnect.makeQuery(s1, output='oneJson')
