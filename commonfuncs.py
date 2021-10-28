@@ -1,5 +1,5 @@
 #commonfuncs.py
-import json, os, time, datetime
+import json, os, time, datetime, uuid
 import pandas as pd
 
 root = os.path.dirname(__file__)
@@ -64,9 +64,6 @@ def keyedJson(df, key='trainNo'):
     return returnD
     
 
-def getDate(offset=5.5):
-    return (datetime.datetime.utcnow()+ datetime.timedelta(hours=offset)).strftime('%Y-%m-%d')
-
 def IRdateConvert(x):
     # sample: "26 Feb 2021", "4 Mar 2021", "-"
     if x == '-': return None
@@ -79,3 +76,19 @@ def parseParams(url):
     parsed = urlparse.urlparse(url)
     return parse_qs(parsed.query)
 
+
+def makeUID(nobreaks=False):
+    if nobreaks:
+        return uuid.uuid4().hex
+    else:
+        return str(uuid.uuid4())
+
+def getDate(timeOffset=5.5, daysOffset=0, returnObj=False):
+    d = datetime.datetime.utcnow().replace(microsecond=0) + datetime.timedelta(hours=timeOffset) + datetime.timedelta(days=daysOffset)
+    if returnObj: return d
+    return d.strftime('%Y-%m-%d')
+
+def getTime(timeOffset=5.5, secsOffset=0, returnObj=False):
+    d = datetime.datetime.utcnow().replace(microsecond=0) + datetime.timedelta(hours=timeOffset) + datetime.timedelta(seconds=secsOffset)
+    if returnObj: return d
+    return d.strftime('%Y-%m-%d %H:%M:%S')

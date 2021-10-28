@@ -160,6 +160,9 @@ def addTable(df, tablename, lowerCaseColumns=False):
     try:
         df[sending_cols].to_sql(name=tablename, con=c, chunksize=CHUNKSIZE, if_exists='append', index=False )
         c.close()
+    except sqlalchemy.exc.IntegrityError as e:
+        cf.logmessage(e)
+        return False
     except:
         c.close()
         raise
