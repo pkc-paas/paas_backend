@@ -11,6 +11,9 @@ from paas_launch import app
 import commonfuncs as cf
 import dbconnect
 
+
+##########################
+
 class singleReq(BaseModel):
     sapling_id: str
     adopted_name: Optional[str] = None
@@ -93,4 +96,73 @@ def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
         "requested_by_others_also": list(alreadyRequested_saplings),
         "already_requested": list(alreadyRequested_thisuser_saplings)
     }
+    return returnD
+
+
+##############################
+
+class mySaplingsReq(BaseModel):
+    sponsor_username: Optional[str] = None
+    observations: Optional[bool] = False
+
+@app.post("/mySaplings")
+def mySaplings(req: mySaplingsReq , x_access_key: Optional[str] = Header(None)):
+    """
+    Get all saplings adopted by a user and optionally their observations
+    """
+    cf.logmessage("mySaplings api call")
+    s1 = f"select username, role from users where token='{x_access_key}'"
+    user = dbconnect.makeQuery(s1, output='oneJson')
+    if not user:
+        cf.logmessage(f"rejected")
+        raise HTTPException(status_code=400, detail="Invalid login")
+
+    cf.logmessage(f"user: {user['username']}, role: {user['role']}")
+    print("observations:",req.observations)
+
+    if user.get('role','') == 'sponsor':
+        sponsor_username = user.get('username')
+    else:
+        # constrain which roles allowed to do this
+        if user.get('role','') not in ('moderator','admin'):
+            raise HTTPException(status_code=400, detail="Insufficient privileges")
+
+        if not req.sponsor_username:
+            raise HTTPException(status_code=400, detail="Missing sponsor_username")
+        sponsor_username = req.sponsor_username
+
+        # cf.logmessage(f"this is not a sponsor")
+        # raise HTTPException(status_code=400, detail="Insufficient privileges")
+
+    s2 = f"""select t1.*, 
+    t2.lat, t2.lon, t2.name, t2.`group`, t2.local_name, t2.botanical_name,
+    t2.planted_date, t2.details, t2.first_photos
+    from adoptions as t1 
+    left join saplings as t2
+    on t1.sapling_id = t2.id
+    where t1.username='{sponsor_username}'
+    and t1.status = 'adopted'
+    and t2.confirmed = 1
+    order by t1.approval_date, t1.adopted_name
+    """
+    df1 = dbconnect.makeQuery(s2, output='df', fillna=True)
+
+    returnD = {
+        "message": "success", 
+        "saplings": df1.to_dict(orient='records')
+    }
+    if not len(df1):
+        returnD['message'] = f"This sponsor {user['username']} doesn't have any approved adopted saplings yet."
+        return returnD
+
+    if req.observations:
+        sapling_ids = df1['sapling_id'].unique()
+        sapling_ids_SQL = cf.quoteNcomma(sapling_ids)
+        s3 = f"""select t1.* from observations as t1
+        where t1.sapling_id in ({sapling_ids_SQL})
+        order by t1.observation_date, t1.id
+        """
+        df2 = dbconnect.makeQuery(s3, output='df', fillna=True)
+        returnD['observations'] = df2.to_dict(orient='records')
+
     return returnD
