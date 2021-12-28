@@ -10,7 +10,7 @@ import pandas as pd
 from paas_launch import app
 import commonfuncs as cf
 import dbconnect
-
+from api_users import authenticate
 
 ##########################
 
@@ -25,15 +25,18 @@ class adoptReq(BaseModel):
 @app.post("/requestAdoption")
 def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("requestAdoption api call")
-    s1 = f"select username, role from users where token='{x_access_key}'"
-    user = dbconnect.makeQuery(s1, output='oneJson')
-    if not user:
-        cf.logmessage(f"rejected")
-        raise HTTPException(status_code=400, detail="Invalid login")
 
-    if user.get('role','') != 'sponsor':
-        cf.logmessage(f"this is not a sponsor")
-        raise HTTPException(status_code=400, detail="Insufficient privileges")
+    username, role = authenticate(x_access_key, allowed_roles=['sponsor'])
+
+    # s1 = f"select username, role from users where token='{x_access_key}'"
+    # user = dbconnect.makeQuery(s1, output='oneJson')
+    # if not user:
+    #     cf.logmessage(f"rejected")
+    #     raise HTTPException(status_code=400, detail="Invalid login")
+
+    # if user.get('role','') != 'sponsor':
+    #     cf.logmessage(f"this is not a sponsor")
+    #     raise HTTPException(status_code=400, detail="Insufficient privileges")
     
     requested_sapling_ids = set([x.sapling_id for x in r.data])
     cf.logmessage('requested_sapling_ids:', requested_sapling_ids)
@@ -62,7 +65,7 @@ def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
 
     # already requested AND by the same user
     # TO DO
-    df_alreadyRequested_thisuser = df_alreadyRequested[df_alreadyRequested['username']==user['username']].copy()
+    df_alreadyRequested_thisuser = df_alreadyRequested[df_alreadyRequested['username']==username].copy()
     alreadyRequested_thisuser_saplings = set(df_alreadyRequested_thisuser['id'])
 
     # available saplings:
@@ -74,10 +77,9 @@ def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
     df_requested = pd.DataFrame([t.__dict__ for t in r.data ])
     
     df_eligible = df_requested[df_requested['sapling_id'].isin(available_saplings)].copy()
-
-    print("Eligible:", )
+    print(df_eligible)
     df_eligible['id'] = df_eligible['sapling_id'].apply(lambda x: cf.makeUID() )
-    df_eligible['username'] = df_eligible['created_by'] = user['username']
+    df_eligible['username'] = df_eligible['created_by'] = username
     df_eligible['status'] = 'requested'
     df_eligible['application_date'] = cf.getDate()
     df_eligible['created_on'] = cf.getTime()

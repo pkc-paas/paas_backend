@@ -94,7 +94,7 @@ def makeQuery(s1, output='oneValue', lowerCaseColumns=False, keepCols=True, fill
             return df
 
 
-def execSQL(s1):
+def execSQL(s1, noprint=False):
     if not isinstance(s1,str):
         cf.logmessage("query needs to be a string")
         return False
@@ -112,9 +112,10 @@ def execSQL(s1):
     global sqlEngine
     try:
         c = sqlEngine.connect()
-        c.execute(s1)
+        res = c.execute(s1)
+        if not noprint: cf.logmessage(f"{res.rowcount} rows affected")
         c.close()
-        return True
+        return res.rowcount
     except sqlalchemy.exc.IntegrityError as e:
         cf.logmessage("This entry already exists, skipping.")
         time.sleep(1)
@@ -167,4 +168,5 @@ def addTable(df, tablename, lowerCaseColumns=False):
         c.close()
         raise
         return False
+    cf.logmessage(f"{len(df)} rows added to {tablename}")
     return True

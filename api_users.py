@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from Cryptodome.PublicKey import RSA
-from fastapi import HTTPException
+from fastapi import HTTPException, Header
 import secrets
 
 from paas_launch import app
@@ -27,6 +27,21 @@ def decrypt(encoded_key,password):
     except ValueError:
         return False
 
+
+def authenticate(token, allowed_roles=['admin']):
+    s1 = f"select username, role from users where token='{token}'"
+    user = dbconnect.makeQuery(s1, output='oneJson', printit=False)
+    if not user:
+        cf.logmessage(f"rejected")
+        raise HTTPException(status_code=400, detail="Invalid login")
+    if len(allowed_roles):
+        if user.get('role') not in allowed_roles:
+            cf.logmessage(f"Insufficient privileges")
+            raise HTTPException(status_code=400, detail="Insufficient privileges")
+    return user['username'], user['role']
+
+
+########################
 
 class loginRBody(BaseModel):
     username: str
@@ -62,6 +77,7 @@ def login(r: loginRBody):
 
     return returnD    
 
+########################
 
 class changePwBody(BaseModel):
     username: str
@@ -69,7 +85,7 @@ class changePwBody(BaseModel):
     newpw: str
 
 @app.post("/changepw")
-def changepw(r: changePwBody):
+def changepw(r: changePwBody, x_access_key: Optional[str] = Header(None)):
     cf.logmessage(f"changepw POST api call")
     s1 = f"select * from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
@@ -92,3 +108,32 @@ def changepw(r: changePwBody):
     }
     return returnD
 
+
+########################
+
+@app.get("/logout")
+def logout(x_access_key: Optional[str] = Header(None)):
+    cf.logmessage("logout api call")
+    print(x_access_key)
+    u1 = f"""update users
+    set token=null
+    where token='{x_access_key}'
+    """
+    uCount = dbconnect.execSQL(u1)
+    if not uCount:
+        cf.logmessage("db error when logging out, but telling frontend to logout out anyways")
+    
+    returnD = {"message":"Logged out"}
+    return returnD
+
+########################
+
+@app.get("/checkUser")
+def logout(x_access_key: Optional[str] = Header(None)):
+    cf.logmessage("checkUser api call")
+    try:
+        username, role = authenticate(x_access_key, allowed_roles=[])
+    except:
+        username, role = None, None
+    returnD = {"message":"", "username":username, "role":role }
+    return returnD
