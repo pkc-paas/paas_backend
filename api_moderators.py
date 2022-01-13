@@ -136,9 +136,13 @@ def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Op
         return returnD
 
     elif req.action.lower() == 'reject':
-        u2 = f"""update adoptions
-        set status = 'rejected',
-        modified_on = '{timestamp}'
+        # u2 = f"""update adoptions
+        # set status = 'rejected',
+        # modified_on = '{timestamp}'
+        # where id in ({idsListSQL})
+        # and status = 'requested'
+        # """
+        u2 = f"""delete from adoptions
         where id in ({idsListSQL})
         and status = 'requested'
         """
