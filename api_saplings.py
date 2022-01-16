@@ -19,10 +19,12 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("getSaplings api call")
     # username, role = authenticate(x_access_key) 
 
-    s1 = f"""select t1.*, 
-    t2.id as adoption_id, t2.username, t2.adopted_name, t2.status as adoption_status
+    s1 = f"""select t1.id, t1.lat, t1.lon, t1.name, t1.group, 
+    t1.local_name, t1.botanical_name, t1.planted_date, t1.data_collection_date,
+    t1.description, t1.first_photos, t1.confirmed,
+    t2.adopted_name, t2.status as adoption_status
     from saplings as t1
-    left join (select * from adoptions where status in ('approved','requested')) as t2
+    left join (select adopted_name, status, sapling_id from adoptions where status in ('approved','requested')) as t2
     on t1.id = t2.sapling_id
     """
     df1 = dbconnect.makeQuery(s1, output='df', fillna=False, printit=True)

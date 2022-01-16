@@ -172,19 +172,3 @@ def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Op
 
 ###############
 
-class processAdoptionChange_payload(BaseModel):
-    idsList: List[str]
-    action: str
-
-
-@app.post("/processAdoptionChange")
-def processAdoptionChange(req: processAdoptionChange_payload, x_access_key: Optional[str] = Header(None)):
-    cf.logmessage("processAdoptionChange api call")
-    
-    username, role = authenticate(x_access_key, allowed_roles=['admin','moderator'])
-    
-    if not len(req.idsList):
-        raise HTTPException(status_code=400, detail="No inputs")
-    
-    timestamp = cf.getTime()
-    date1 = cf.getDate()
