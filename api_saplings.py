@@ -32,6 +32,9 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
         cf.logmessage(f"no data")
         raise HTTPException(status_code=400, detail="No data sorry")
     
+    # photos: make into array
+    df1['first_photos'] = df1['first_photos'].apply(lambda x: x.split(','))
+    
     # split it
     df_confirmed = df1[df1['confirmed']==1]
     df_unconfirmed = df1[df1['confirmed']!=1]
