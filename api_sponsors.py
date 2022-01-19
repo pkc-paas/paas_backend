@@ -22,7 +22,7 @@ class singleReq(BaseModel):
 class adoptReq(BaseModel):
     data: List[singleReq]
 
-@app.post("/requestAdoption")
+@app.post("/API/requestAdoption", tags=["adoptions"])
 def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("requestAdoption api call")
 
@@ -107,7 +107,7 @@ class mySaplingsReq(BaseModel):
     sponsor_username: Optional[str] = None
     observations: Optional[bool] = False
 
-@app.post("/mySaplings")
+@app.post("/API/mySaplings", tags=["saplings"])
 def mySaplings(req: mySaplingsReq , x_access_key: Optional[str] = Header(None)):
     """
     Get all saplings adopted by a user and optionally their observations

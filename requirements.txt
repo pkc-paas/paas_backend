@@ -4,3 +4,5 @@ pandas
 fastapi
 uvicorn[standard]
 pycryptodomex
+python-multipart
+pillow

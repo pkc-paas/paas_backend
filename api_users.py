@@ -48,7 +48,7 @@ class loginRBody(BaseModel):
     pw: str
 
 
-@app.post("/login")
+@app.post("/API/login", tags=["users"])
 def login(r: loginRBody):
     cf.logmessage(f"login POST api call")
     s1 = f"select * from users where username='{r.username}'"
@@ -84,7 +84,7 @@ class changePwBody(BaseModel):
     oldpw: str
     newpw: str
 
-@app.post("/changepw")
+@app.post("/API/changepw", tags=["users"])
 def changepw(r: changePwBody, x_access_key: Optional[str] = Header(None)):
     cf.logmessage(f"changepw POST api call")
     s1 = f"select * from users where username='{r.username}'"
@@ -111,7 +111,7 @@ def changepw(r: changePwBody, x_access_key: Optional[str] = Header(None)):
 
 ########################
 
-@app.get("/logout")
+@app.get("/API/logout", tags=["users"])
 def logout(x_access_key: Optional[str] = Header(None)):
     cf.logmessage("logout api call")
     print(x_access_key)
@@ -128,7 +128,7 @@ def logout(x_access_key: Optional[str] = Header(None)):
 
 ########################
 
-@app.get("/checkUser")
+@app.get("/API/checkUser", tags=["users"])
 def logout(x_access_key: Optional[str] = Header(None)):
     cf.logmessage("checkUser api call")
     try:

@@ -3,3 +3,6 @@ logs
 local_launch.sh
 paas_server_launch.sh
 photos
+observation_files
+observation_thumbs
+sapling_thumbs

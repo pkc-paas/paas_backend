@@ -16,7 +16,7 @@ from api_users import authenticate
 
 ###############
 
-@app.post("/viewAdoptionEntries")
+@app.post("/API/viewAdoptionEntries", tags=["adoptions"])
 def viewAdoptionEntries(x_access_key: Optional[str] = Header(None)):
     cf.logmessage("viewAdoptionEntries api call")
 
@@ -81,7 +81,7 @@ class processAdoptionRequest_payload(BaseModel):
     action: str
 
 
-@app.post("/processAdoptionRequest")
+@app.post("/API/processAdoptionRequest", tags=["adoptions"])
 def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("processAdoptionRequest api call")
     

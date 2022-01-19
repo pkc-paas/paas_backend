@@ -84,7 +84,10 @@ def parseParams(url):
 #         return str(uuid.uuid4())
 
 def makeUID(length=4):
-    return secrets.token_urlsafe(length).upper()
+    while True:
+        a = secrets.token_urlsafe(length).upper()
+        if a[0].isalpha(): break
+    return a
 
 
 def getDate(timeOffset=5.5, daysOffset=0, returnObj=False):
@@ -96,3 +99,10 @@ def getTime(timeOffset=5.5, secsOffset=0, returnObj=False):
     d = datetime.datetime.utcnow().replace(microsecond=0) + datetime.timedelta(hours=timeOffset) + datetime.timedelta(seconds=secsOffset)
     if returnObj: return d
     return d.strftime('%Y-%m-%d %H:%M:%S')
+
+def valiDate(d):
+    try:
+        datetime.datetime.strptime(d,'%Y-%m-%d')
+    except ValueError as e:
+        return False
+    return True

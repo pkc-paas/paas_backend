@@ -4,17 +4,22 @@ from typing import Optional
 from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from fastapi import HTTPException, Header
-import secrets
+import secrets, os
 
 from paas_launch import app
 import commonfuncs as cf
 import dbconnect
 from api_users import authenticate
 
+root = os.path.dirname(__file__)
+
+
+####################
+
 class saplingReq(BaseModel):
     criteria: Optional[str] = None
 
-@app.post("/getSaplings")
+@app.post("/API/getSaplings", tags=["saplings"])
 def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("getSaplings api call")
     # username, role = authenticate(x_access_key) 
@@ -33,7 +38,13 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
         raise HTTPException(status_code=400, detail="No data sorry")
     
     # photos: make into array
-    df1['first_photos'] = df1['first_photos'].apply(lambda x: x.split(','))
+
+    def splitter(x):
+        if x:
+            return x.split(',')
+        else:
+            return []
+    df1['first_photos'] = df1['first_photos'].apply(splitter)
     
     # split it
     df_confirmed = df1[df1['confirmed']==1]
@@ -52,14 +63,14 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     return returnD
 
 
-@app.get("/getPhoto")
-def getPhoto(f: str):
-    cf.logmessage("getPhoto api call")
-    if os.path.isfile(os.path.join(root, 'photos', f)):
-        return FileResponse(os.path.join(root, 'photos', f))
-    else:
-        print(f"{f} not found")
-        return {
-            "status" : "FAIL",
-            "message" : "not found"
-        }
+# @app.get("/API/getPhoto", tags=["photos"])
+# def getPhoto(f: str):
+#     cf.logmessage("getPhoto api call")
+#     if os.path.isfile(os.path.join(root, 'photos', f)):
+#         return FileResponse(os.path.join(root, 'photos', f))
+#     else:
+#         cf.logmessage(f"{f} not found")
+#         return {
+#             "status" : "FAIL",
+#             "message" : "not found"
+#         }
