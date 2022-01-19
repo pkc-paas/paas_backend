@@ -155,7 +155,8 @@ def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Op
     elif req.action.lower() == 'remove':
         u3 = f"""update adoptions
         set status = 'requested',
-        modified_on = '{timestamp}'
+        modified_on = '{timestamp}',
+        approval_date = NULL
         where id in ({idsListSQL})
         and status = 'approved'
         """
