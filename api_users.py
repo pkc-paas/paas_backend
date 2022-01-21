@@ -5,26 +5,23 @@ from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from Cryptodome.PublicKey import RSA
 from fastapi import HTTPException, Header
-import secrets
+import secrets, bcrypt
 
 from paas_launch import app
 import commonfuncs as cf
 import dbconnect
 
+
 def encrypt(password):
-    key = RSA.generate(2048)
-    encrypted_key = key.exportKey(passphrase=password, pkcs=8, protection="scryptAndAES128-CBC").decode('utf')
-    return encrypted_key
+    salt = bcrypt.gensalt()
+    hash_string = bcrypt.hashpw(password.encode('utf-8'), salt).decode()
+    return hash_string
 
 
-def decrypt(encoded_key,password):
-    # from https://stackoverflow.com/questions/2490334/simple-way-to-encode-a-string-according-to-a-password
-    if len(password) == 0:
-        return False
-    try:
-        key = RSA.import_key(encoded_key, passphrase=password)
+def decrypt(hash_string,pwd):
+    if bcrypt.checkpw(pwd.encode('utf-8'), hash_string.encode('utf-8')):
         return True
-    except ValueError:
+    else:
         return False
 
 
@@ -51,7 +48,7 @@ class loginRBody(BaseModel):
 @app.post("/API/login", tags=["users"])
 def login(r: loginRBody):
     cf.logmessage(f"login POST api call")
-    s1 = f"select * from users where username='{r.username}'"
+    s1 = f"select username, pwd from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
         raise HTTPException(status_code=400, detail="Invalid username")
@@ -61,7 +58,7 @@ def login(r: loginRBody):
     
     # default else    
     cf.logmessage(f"user {row['username']} authenticated")
-    token = secrets.token_urlsafe(75) # produces a 100 char length string
+    token = secrets.token_urlsafe(25) 
     u1 = f"""update users 
     set token = '{token}', 
     last_login = CURRENT_TIMESTAMP
