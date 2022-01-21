@@ -152,8 +152,8 @@ def uploadSapling(
         iVals.append(f"'{planted_date}'")
     
 
-    i1 = f"""insert into saplings (id, lat, lon, data_collection_date, first_photos, created_on, created_by, confirmed, {','.join(iCols)})
-    values ('{sid}', {lat},{lon}, '{data_collection_date}', '{','.join(fileids)}', CURRENT_TIMESTAMP, '{username}', 0, {','.join(iVals)})
+    i1 = f"""insert into saplings (id, name, lat, lon, data_collection_date, first_photos, created_on, created_by, confirmed, {','.join(iCols)})
+    values ('{sid}', '{name}', {lat},{lon}, '{data_collection_date}', '{','.join(fileids)}', CURRENT_TIMESTAMP, '{username}', 0, {','.join(iVals)})
     """
     i1Count = dbconnect.execSQL(i1, noprint=False)
 
