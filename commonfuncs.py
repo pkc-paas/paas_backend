@@ -106,3 +106,16 @@ def valiDate(d):
     except ValueError as e:
         return False
     return True
+
+def validateLL(lat, lon):
+    if not isinstance(lat, (int, float)): return False
+    if not isinstance(lon, (int, float)): return False
+
+    latLimits = (-90,90)
+    lonLimits = (-180,180)
+
+    if lat < latLimits[0] or lat > latLimits[1]: return False
+    if lon < lonLimits[0] or lon > lonLimits[1]: return False
+    return True
+
+    

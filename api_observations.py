@@ -55,14 +55,9 @@ def viewObservations(req: viewObservations_payload, x_access_key: Optional[str] 
 
 ############
 
-# def compressImage(idf):
-#     im = Image.open(os.path.join(observationsFolder, idf))
-#     im2 = ImageOps.fit(im, (150,150))
-#     im2.save(os.path.join(observationsThumbnailsFolder, idf))
-#     return
 
 # instead of re-reading image from disk, taking the file pointer already loaded in memory.
-def compressImage(f, idf):
+def compressObsImage(f, idf):
     im = Image.open(f, mode='r')
     im2 = ImageOps.fit(im, (150,200))
     im2.save(os.path.join(observationsThumbnailsFolder, idf))
@@ -108,7 +103,7 @@ def postObservation(
         with open(os.path.join(observationsFolder, idf),'wb') as f:
             f.write(file1.file.read())
         
-        compressImage(file1.file, idf) # sending the file pointer and filename
+        compressObsImage(file1.file, idf) # sending the file pointer and filename
         fileids.append(idf)
 
     
