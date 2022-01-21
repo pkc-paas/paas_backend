@@ -39,6 +39,8 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     on t1.id = t2.sapling_id
     """
     df1 = dbconnect.makeQuery(s1, output='df', fillna=False, printit=True)
+    
+    # df1.to_csv('saplings.csv', index=False)
     if not len(df1):
         cf.logmessage(f"no data")
         raise HTTPException(status_code=400, detail="No data sorry")
@@ -150,8 +152,8 @@ def uploadSapling(
         iVals.append(f"'{planted_date}'")
     
 
-    i1 = f"""insert into saplings (id, lat, lon, data_collection_date, first_photos, created_on, created_by, {','.join(iCols)})
-    values ('{sid}', {lat},{lon}, '{data_collection_date}', '{','.join(fileids)}', CURRENT_TIMESTAMP, '{username}', {','.join(iVals)})
+    i1 = f"""insert into saplings (id, lat, lon, data_collection_date, first_photos, created_on, created_by, confirmed, {','.join(iCols)})
+    values ('{sid}', {lat},{lon}, '{data_collection_date}', '{','.join(fileids)}', CURRENT_TIMESTAMP, '{username}', 0, {','.join(iVals)})
     """
     i1Count = dbconnect.execSQL(i1, noprint=False)
 
