@@ -10,7 +10,8 @@ from PIL import Image, ImageOps
 from paas_launch import app
 import commonfuncs as cf
 import dbconnect
-from api_users import authenticate
+from api_users import authenticate, findRole
+
 
 root = os.path.dirname(__file__)
 
@@ -28,7 +29,7 @@ class saplingReq(BaseModel):
 @app.post("/API/getSaplings", tags=["saplings"])
 def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("getSaplings api call")
-    # username, role = authenticate(x_access_key) 
+    username, role = findRole(x_access_key)
 
     s1 = f"""select t1.id, t1.lat, t1.lon, t1.name, t1.group, 
     t1.local_name, t1.botanical_name, t1.planted_date, t1.data_collection_date,
@@ -37,6 +38,8 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     from saplings as t1
     left join (select adopted_name, status, sapling_id from adoptions where status in ('approved','requested')) as t2
     on t1.id = t2.sapling_id
+    where (t1.status != 'rejected') OR (t1.status is NULL)
+    order by t1.data_collection_date
     """
     df1 = dbconnect.makeQuery(s1, output='df', fillna=False, printit=True)
     
@@ -60,10 +63,12 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
 
     returnD = {
         "message" : f"Retrieved {len(df1)} saplings",
-        "data_confirmed" : df_confirmed.to_dict(orient='records'),
-        "data_unconfirmed" : df_unconfirmed.to_dict(orient='records')
+        "data_confirmed" : df_confirmed.to_dict(orient='records')
     }
 
+    # include unconfirmed only if 
+    if role in ('admin','saplings_admin','moderator'):
+        returnD["data_unconfirmed"] = df_unconfirmed.to_dict(orient='records')
     # # fetch adoption status
     # s2 = f"""select sapling_id, username, adopted_name, status from adoptions where status in ('approved','requested')"""
     # df2 = dbconnect.makeQuery(s2, output='df', fillna=False, printit=True)
@@ -173,3 +178,94 @@ def uploadSapling(
 #             "status" : "FAIL",
 #             "message" : "not found"
 #         }
+
+
+class processUploadedSaplingReq(BaseModel):
+    sapling_id: str = None
+    accepted: bool = None
+
+@app.post("/API/processUploadedSapling", tags=["saplings"])
+def processUploadedSapling(req: processUploadedSaplingReq, x_access_key: Optional[str] = Header(None)):
+    cf.logmessage("getSaplings api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin','moderator','saplings_admin','saplings_entry'])
+
+    sapling_id = req.sapling_id
+    accepted = req.accepted
+
+    s1 = f"select * from saplings where id='{sapling_id}'"
+    saplingD = dbconnect.makeQuery(s1, output='oneJson')
+    if not len(saplingD):
+        raise HTTPException(status_code=400, detail="Invalid sapling_id")
+
+
+    if accepted:
+        u1 = f"update saplings set confirmed=1 where sapling_id = '{sapling_id}'"
+        u1Count = dbconnect.execSQL(u1)
+        if not u1Count:
+            raise HTTPException(status_code=400, detail="Not able to update in DB")
+
+    else:
+        ui = f"update saplings set status='rejected' where sapling_id = '{sapling_id}'"
+        u1Count = dbconnect.execSQL(u1)
+        if not u1Count:
+            raise HTTPException(status_code=400, detail="Not able to update in DB")
+
+    returnD = {'status':'success'}
+    return returnD
+
+
+########################
+
+class editSaplingReq(BaseModel):
+    sapling_id: str
+    name: str
+    local_name: str = None
+    botanical_name: str = None
+    planted_date: str = None
+    data_collection_date: str = None
+    group: str = None
+    description: str = None
+
+@app.post("/API/editSapling", tags=["saplings"])
+def processUploadedSapling(req: editSaplingReq, x_access_key: Optional[str] = Header(None)):
+    cf.logmessage("getSaplings api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin','moderator','saplings_admin','saplings_entry'])
+
+    # fetch existing sapling data
+    s1 = f"select * from saplings where id='{req.sapling_id}'"
+    existingD = dbconnect.makeQuery(s1, output='oneJson')
+    if not existingD:
+        raise HTTPException(status_code=400, detail="Invalid sapling_id")
+
+    uHolder = []
+    if req.name and req.name != existingD['name']: 
+        uHolder.append(f"name = '{req.name}'")
+    if req.local_name and req.local_name != existingD['local_name']: 
+        uHolder.append(f"local_name = '{req.local_name}'")
+    if req.botanical_name and req.botanical_name != existingD['botanical_name']: 
+        uHolder.append(f"botanical_name = '{req.botanical_name}'")
+    if req.planted_date and req.planted_date != existingD['planted_date']: 
+        uHolder.append(f"planted_date = '{req.planted_date}'")
+    if req.data_collection_date and req.data_collection_date != existingD['data_collection_date']: 
+        uHolder.append(f"data_collection_date = '{req.data_collection_date}'")
+    if req.group and req.group != existingD['group']: 
+        uHolder.append(f"group = '{req.group}'")
+    if req.description and req.description != existingD['description']: 
+        uHolder.append(f"description = '{req.description}'")
+
+    if not len(uHolder):
+        raise HTTPException(status_code=400, detail="Nothing to update")
+        
+    uHolder.append(f"modified_on = CURRENT_TIMESTAMP")
+    uHolder.append(f"modified_by = '{username}'")
+
+    u1 = f"""update saplings
+    set {','.join(uHolder)}
+    where id = '{req.sapling_id}'
+    """
+    u1Count = dbconnect.execSQL(u1)
+
+    if u1Count == 1:
+        returnD = {'status': 'success', 'sapling_id': req.sapling_id}
+    else:
+        raise HTTPException(status_code=400, detail="Not able to update in DB")

@@ -170,3 +170,4 @@ def addTable(df, tablename, lowerCaseColumns=False):
         return False
     cf.logmessage(f"{len(df)} rows added to {tablename}")
     return True
+

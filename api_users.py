@@ -38,6 +38,14 @@ def authenticate(token, allowed_roles=['admin']):
     return user['username'], user['role']
 
 
+def findRole(token):
+    s1 = f"select username, role from users where token='{token}'"
+    user = dbconnect.makeQuery(s1, output='oneJson', printit=False)
+    if not user:
+        return None, None
+    else:
+        return user['username'], user['role']
+
 ########################
 
 class loginRBody(BaseModel):
