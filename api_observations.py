@@ -33,7 +33,7 @@ def viewObservations(req: viewObservations_payload, x_access_key: Optional[str] 
     
     # username, role = authenticate(x_access_key, allowed_roles=['admin','moderator'])
     
-    if not len(req.idsList):
+    if not len(req.saplingsList):
         raise HTTPException(status_code=400, detail="No inputs")
     
     timestamp = cf.getTime()

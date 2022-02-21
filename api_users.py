@@ -1,6 +1,6 @@
 # api_users.py
 
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from Cryptodome.PublicKey import RSA
@@ -134,7 +134,7 @@ def logout(x_access_key: Optional[str] = Header(None)):
 ########################
 
 @app.get("/API/checkUser", tags=["users"])
-def logout(x_access_key: Optional[str] = Header(None)):
+def checkUser(x_access_key: Optional[str] = Header(None)):
     cf.logmessage("checkUser api call")
     try:
         username, role = authenticate(x_access_key, allowed_roles=[])
@@ -142,3 +142,61 @@ def logout(x_access_key: Optional[str] = Header(None)):
         username, role = None, None
     returnD = {"message":"", "username":username, "role":role }
     return returnD
+
+
+########################
+
+
+class createUser_paylaod(BaseModel):
+    username: str
+    role: str
+    pwd: str
+    email: str
+
+@app.post("/API/createUser", tags=["users"])
+def createUser(req: createUser_paylaod, x_access_key: Optional[str] = Header(None)):
+    cf.logmessage("createUser api call")
+
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    
+    s1 = f"select username from users where username = '{req.username}'"
+    exist = dbconnect.makeQuery(s1, output="oneValue")
+    if exist:
+        raise HTTPException(status_code=400, detail="This username is already taken")
+        
+    hash_string = encrypt(req.pwd)
+    i1 = f"""insert into users (username, email, role, pwd, fullname, created_by, created_on) values
+    ('{req.username}','{req.email}','{req.role}','{hash_string}','{req.username}','{username}',CURRENT_TIMESTAMP)
+    """
+    cf.logmessage(f"Creating user {req.username} {req.role} {req.email}")
+    iCount = dbconnect.execSQL(i1, noprint=True)
+    
+    # to do: send automated emails
+
+    returnD = {'status':'success'}
+    if iCount:
+        returnD['added_count'] = iCount
+        return returnD
+    else:
+        raise HTTPException(status_code=400, detail="Failed to insert new user entry")
+
+
+########################
+
+
+class deleteUsers_payload(BaseModel):
+    usersList: List[str]
+
+@app.post("/API/deleteUsers", tags=["users"])
+def deleteUsers(req: deleteUsers_payload, x_access_key: Optional[str] = Header(None)):
+    cf.logmessage("deleteUsers api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    
+    usersListSQL = cf.quoteNcomma(req.usersList)
+    d1 = f"delete from users where username in ({usersListSQL})"
+    d1Count = dbconnect.execSQL(d1)
+
+    returnD = {'status':'success'}
+    returnD['deleted_count'] = d1Count
+    return returnD
+

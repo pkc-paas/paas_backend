@@ -34,6 +34,7 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     s1 = f"""select t1.id, t1.lat, t1.lon, t1.name, t1.group, 
     t1.local_name, t1.botanical_name, t1.planted_date, t1.data_collection_date,
     t1.description, t1.first_photos, t1.confirmed,
+    t1.height, t1.canopy, t1.girth_1m,
     t2.adopted_name, t2.status as adoption_status
     from saplings as t1
     left join (select adopted_name, status, sapling_id from adoptions where status in ('approved','requested')) as t2

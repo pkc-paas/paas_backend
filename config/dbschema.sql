@@ -37,6 +37,9 @@ CREATE TABLE saplings(
 	created_by VARCHAR(32) NULL,
 	modified_on DATETIME NULL,
 	modified_by VARCHAR(32) NULL,
+	height DECIMAL(6,2) NULL,
+	canopy DECIMAL(6,2) NULL,
+	girth_1m DECIMAL(6,2) NULL,
 	CONSTRAINT saplings_c1 UNIQUE (lat, lon)
 );
 CREATE INDEX saplings_i1 ON saplings (planted_date);
@@ -90,3 +93,21 @@ CREATE INDEX observations_i1 ON observations (sapling_id);
 CREATE INDEX observations_i2 ON observations (observation_date);
 CREATE INDEX observations_i3 ON observations (confirmed);
 
+
+DROP TABLE IF EXISTS species;
+CREATE TABLE species(
+	id VARCHAR(10) NOT NULL PRIMARY KEY,
+	local_name VARCHAR(100) NULL,
+	botanical_name VARCHAR(100) NULL,
+	description VARCHAR(500) NULL,
+	economic VARCHAR(100) NULL,
+	phenology VARCHAR(100) NULL,
+	flowering VARCHAR(100) NULL,
+	fruiting VARCHAR(100) NULL,
+	nativity VARCHAR(100) NULL,
+	is_rare VARCHAR(1) NULL,
+	created_on DATETIME NULL,
+	created_by VARCHAR(32) NULL,
+	modified_on DATETIME NULL,
+	modified_by VARCHAR(32) NULL
+);
