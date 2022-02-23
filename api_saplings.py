@@ -58,6 +58,9 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
             return []
     df1['first_photos'] = df1['first_photos'].apply(splitter)
     
+    # create a combined column for searching
+    df1['search'] = df1.fillna('').apply(lambda x: f"{x['name']} {x['id']} {x['group']} {x['local_name']} {x['botanical_name']} {x['adopted_name']}", axis=1)
+
     # split it
     df_confirmed = df1[df1['confirmed']==1]
     df_unconfirmed = df1[df1['confirmed']!=1]
@@ -67,9 +70,9 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
         "data_confirmed" : df_confirmed.to_dict(orient='records')
     }
 
-    # include unconfirmed only if 
-    if role in ('admin','saplings_admin','moderator'):
-        returnD["data_unconfirmed"] = df_unconfirmed.to_dict(orient='records')
+    # # include unconfirmed only if 
+    # if role in ('admin','saplings_admin','moderator'):
+    returnD["data_unconfirmed"] = df_unconfirmed.to_dict(orient='records')
     # # fetch adoption status
     # s2 = f"""select sapling_id, username, adopted_name, status from adoptions where status in ('approved','requested')"""
     # df2 = dbconnect.makeQuery(s2, output='df', fillna=False, printit=True)
@@ -200,13 +203,13 @@ def processUploadedSapling(req: processUploadedSaplingReq, x_access_key: Optiona
 
 
     if accepted:
-        u1 = f"update saplings set confirmed=1 where sapling_id = '{sapling_id}'"
+        u1 = f"update saplings set confirmed=1 where id = '{sapling_id}'"
         u1Count = dbconnect.execSQL(u1)
         if not u1Count:
             raise HTTPException(status_code=400, detail="Not able to update in DB")
 
     else:
-        ui = f"update saplings set status='rejected' where sapling_id = '{sapling_id}'"
+        ui = f"update saplings set status='rejected' where id = '{sapling_id}'"
         u1Count = dbconnect.execSQL(u1)
         if not u1Count:
             raise HTTPException(status_code=400, detail="Not able to update in DB")

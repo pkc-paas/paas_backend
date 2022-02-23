@@ -26,7 +26,14 @@ def decrypt(hash_string,pwd):
 
 
 def authenticate(token, allowed_roles=['admin']):
-    s1 = f"select username, role from users where token='{token}'"
+    s1 = f"""select t1.username, t2.role
+    from sessions as t1
+    left join users as t2
+    on t1.username = t2.username
+    where t1.token = '{token}'
+    """
+    #s1 = f"select username, role from users where token='{token}'"
+
     user = dbconnect.makeQuery(s1, output='oneJson', printit=False)
     if not user:
         cf.logmessage(f"rejected")
@@ -39,7 +46,13 @@ def authenticate(token, allowed_roles=['admin']):
 
 
 def findRole(token):
-    s1 = f"select username, role from users where token='{token}'"
+    # s1 = f"select username, role from users where token='{token}'"
+    s1 = f"""select t1.username, t2.role
+    from sessions as t1
+    left join users as t2
+    on t1.username = t2.username
+    where t1.token = '{token}'
+    """
     user = dbconnect.makeQuery(s1, output='oneJson', printit=False)
     if not user:
         return None, None
@@ -52,7 +65,6 @@ class loginRBody(BaseModel):
     username: str
     pw: str
 
-
 @app.post("/API/login", tags=["users"])
 def login(r: loginRBody):
     cf.logmessage(f"login POST api call")
@@ -60,20 +72,24 @@ def login(r: loginRBody):
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
         raise HTTPException(status_code=400, detail="Invalid username")
+    
     if not decrypt(row['pwd'], r.pw):
         cf.logmessage(f"rejected")
         raise HTTPException(status_code=400, detail="Invalid login")
     
     # default else    
     cf.logmessage(f"user {row['username']} authenticated")
-    token = secrets.token_urlsafe(25) 
-    u1 = f"""update users 
-    set token = '{token}', 
-    last_login = CURRENT_TIMESTAMP
-    where username = '{r.username}'
+    token = secrets.token_urlsafe(25)
+    i1 = f"""insert into sessions (token, username, created_on) values 
+    ('{token}','{row['username']}', CURRENT_TIMESTAMP)
     """
-
-    dbconnect.execSQL(u1)
+    iCount = dbconnect.execSQL(i1)
+    
+    # u1 = f"""update users 
+    # set token = '{token}', 
+    # last_login = CURRENT_TIMESTAMP
+    # where username = '{r.username}'
+    # """
 
     returnD = {
         "message": "Successfully logged in user",
@@ -90,23 +106,27 @@ class changePwBody(BaseModel):
     newpw: str
 
 @app.post("/API/changepw", tags=["users"])
-def changepw(r: changePwBody, x_access_key: Optional[str] = Header(None)):
+def changepw(r: changePwBody):
     cf.logmessage(f"changepw POST api call")
     s1 = f"select * from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
         raise HTTPException(status_code=400, detail="Invalid username")
+    
     if not decrypt(row['pwd'], r.oldpw):
         cf.logmessage(f"rejected")
         raise HTTPException(status_code=400, detail="Invalid login")
 
     new_password = encrypt(r.newpw)
     u1 = f"""update users
-    set pwd = '{new_password}',
-    token = null
+    set pwd = '{new_password}'
     where username='{r.username}'
     """
     status = dbconnect.execSQL(u1)
+
+    # also clearing all existing sessions
+    d1 = f"delete from sessions where username = '{r.username}"
+    status2 = dbconnect.execSQL(d1)
 
     returnD = {
         "message": "password changed successfully. Pls login with new password."
@@ -119,12 +139,15 @@ def changepw(r: changePwBody, x_access_key: Optional[str] = Header(None)):
 @app.get("/API/logout", tags=["users"])
 def logout(x_access_key: Optional[str] = Header(None)):
     cf.logmessage("logout api call")
-    print(x_access_key)
-    u1 = f"""update users
-    set token=null
-    where token='{x_access_key}'
-    """
-    uCount = dbconnect.execSQL(u1)
+    
+    d1 = f"delete from sessions where token='{x_access_key}'"
+    uCount = dbconnect.execSQL(d1)
+    
+    # u1 = f"""update users
+    # set token=null
+    # where token='{x_access_key}'
+    # """
+    # uCount = dbconnect.execSQL(u1)
     if not uCount:
         cf.logmessage("db error when logging out, but telling frontend to logout out anyways")
     
@@ -140,6 +163,7 @@ def checkUser(x_access_key: Optional[str] = Header(None)):
         username, role = authenticate(x_access_key, allowed_roles=[])
     except:
         username, role = None, None
+    cf.logmessage(f"user: {username} role: {role}")
     returnD = {"message":"", "username":username, "role":role }
     return returnD
 
@@ -147,14 +171,16 @@ def checkUser(x_access_key: Optional[str] = Header(None)):
 ########################
 
 
-class createUser_paylaod(BaseModel):
+class createUser_payload(BaseModel):
     username: str
     role: str
     pwd: str
     email: str
+    fullname: Optional[str]
+    remarks: Optional[str]
 
 @app.post("/API/createUser", tags=["users"])
-def createUser(req: createUser_paylaod, x_access_key: Optional[str] = Header(None)):
+def createUser(req: createUser_payload, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("createUser api call")
 
     username, role = authenticate(x_access_key, allowed_roles=['admin'])
@@ -200,3 +226,23 @@ def deleteUsers(req: deleteUsers_payload, x_access_key: Optional[str] = Header(N
     returnD['deleted_count'] = d1Count
     return returnD
 
+
+########################
+
+
+@app.get("/API/listUsers", tags=["users"])
+def listUsers( x_access_key: Optional[str] = Header(...)):
+    cf.logmessage("listUsers api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+
+    s1 = f"""select username, email, role, fullname, remarks, status,
+    last_login, created_on, created_by, last_pw_change
+    from users
+    order by created_on desc
+    """
+    uList = dbconnect.makeQuery(s1, output='list')
+    returnD = {'status':'success'}
+    returnD['data'] = uList
+    returnD['count'] = len(uList)
+
+    return returnD

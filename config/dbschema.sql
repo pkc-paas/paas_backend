@@ -17,6 +17,14 @@ CREATE INDEX users_i1 ON users (token);
 CREATE INDEX users_i2 ON users (role);
 
 
+DROP TABLE IF EXISTS sessions;
+CREATE TABLE users(
+	token VARCHAR(50) NOT NULL PRIMARY KEY,
+	username VARCHAR(50) NOT NULL,
+	created_on DATETIME NULL
+);
+
+
 DROP TABLE IF EXISTS saplings;
 CREATE TABLE saplings(
 	id VARCHAR(36) NOT NULL PRIMARY KEY,
@@ -111,3 +119,6 @@ CREATE TABLE species(
 	modified_on DATETIME NULL,
 	modified_by VARCHAR(32) NULL
 );
+
+
+
