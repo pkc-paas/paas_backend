@@ -86,7 +86,8 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
 # instead of re-reading image from disk, taking the file pointer already loaded in memory.
 def compressSapImage(f, idf):
     im = Image.open(f, mode='r')
-    im2 = ImageOps.fit(im, (150,200))
+    im1 = ImageOps.exif_transpose(im) # auto-rotate mobile photos. from https://stackoverflow.com/a/63798032/4355695
+    im2 = ImageOps.fit(im1, (150,200))
     im2.save(os.path.join(saplingThumbFolder, idf))
     return
 
@@ -103,8 +104,12 @@ def uploadSapling(
         local_name: Optional[str] = Form(None),
         botanical_name: Optional[str] = Form(None),
         planted_date: Optional[str] = Form(None),
-        description: Optional[str] = Form(None)
+        description: Optional[str] = Form(None),
+        height: Optional[float] = Form(None),
+        canopy: Optional[float] = Form(None),
+        girth_1m: Optional[float] = Form(None)
     ):
+    # t1.height, t1.canopy, t1.girth_1m,
     # ref: https://github.com/tiangolo/fastapi/issues/854#issuecomment-573965912 for optional form fields etc
     cf.logmessage("uploadSapling api call")
 
@@ -160,6 +165,17 @@ def uploadSapling(
         iCols.append('planted_date')
         iVals.append(f"'{planted_date}'")
     
+    if height:
+        iCols.append('height')
+        iVals.append(f"{height}")
+
+    if canopy:
+        iCols.append('canopy')
+        iVals.append(f"{canopy}")
+
+    if girth_1m:
+        iCols.append('girth_1m')
+        iVals.append(f"{girth_1m}")
 
     i1 = f"""insert into saplings (id, name, lat, lon, data_collection_date, first_photos, created_on, created_by, confirmed, {','.join(iCols)})
     values ('{sid}', '{name}', {lat},{lon}, '{data_collection_date}', '{','.join(fileids)}', CURRENT_TIMESTAMP, '{username}', 0, {','.join(iVals)})
@@ -229,6 +245,7 @@ class editSaplingReq(BaseModel):
     data_collection_date: str = None
     group: str = None
     description: str = None
+    height: float = None
 
 @app.post("/API/editSapling", tags=["saplings"])
 def processUploadedSapling(req: editSaplingReq, x_access_key: Optional[str] = Header(None)):
@@ -256,6 +273,8 @@ def processUploadedSapling(req: editSaplingReq, x_access_key: Optional[str] = He
         uHolder.append(f"group = '{req.group}'")
     if req.description and req.description != existingD['description']: 
         uHolder.append(f"description = '{req.description}'")
+    if req.height and req.height != existingD['height']: 
+        uHolder.append(f"height = {req.height}")
 
     if not len(uHolder):
         raise HTTPException(status_code=400, detail="Nothing to update")
