@@ -26,6 +26,7 @@ import api_saplings
 import api_sponsors
 import api_moderators
 import api_observations
+import api_email
 
 
 app.mount("/static/sapling_photos", StaticFiles(directory="photos", html = False), name="static")
