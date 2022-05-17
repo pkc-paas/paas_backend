@@ -84,11 +84,22 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
 # upload a sapling
 
 # instead of re-reading image from disk, taking the file pointer already loaded in memory.
-def compressSapImage(f, idf):
+def saveSapImage(f, idf):
     im = Image.open(f, mode='r')
     im1 = ImageOps.exif_transpose(im) # auto-rotate mobile photos. from https://stackoverflow.com/a/63798032/4355695
+    
+    # save thumbnail
     im2 = ImageOps.fit(im1, (150,200))
     im2.save(os.path.join(saplingThumbFolder, idf))
+    
+    # save picture, but downsize to within 2000x2000px in case its big, to optimize storage
+    w, h = im1.size
+    if(h > 2000 or w > 2000):
+        im3 = ImageOps.contain(im1, (2000,2000))
+        im3.save(os.path.join(saplingFolder, idf))
+    else:
+        im1.save(os.path.join(saplingFolder, idf))
+    
     return
 
 
@@ -138,11 +149,11 @@ def uploadSapling(
             raise HTTPException(status_code=400, detail="Invalid files")
         
         idf = f"{sid}_{fN+1}.{extension}"
-        print(filename, idf)
-        with open(os.path.join(saplingFolder, idf),'wb') as f:
-            f.write(file1.file.read())
+        # print(filename, idf)
+        # with open(os.path.join(saplingFolder, idf),'wb') as f:
+        #     f.write(file1.file.read())
         
-        compressSapImage(file1.file, idf) # sending the file pointer and filename
+        saveSapImage(file1.file, idf) # sending the file pointer and filename
         fileids.append(idf)
 
     
@@ -187,6 +198,7 @@ def uploadSapling(
 
 
 # photo fetch api retired, replaced with fastapi's direct static path mounting.
+# but keep the code around for demo of FileResponse
 # @app.get("/API/getPhoto", tags=["photos"])
 # def getPhoto(f: str):
 #     cf.logmessage("getPhoto api call")
@@ -248,8 +260,8 @@ class editSaplingReq(BaseModel):
     height: float = None
 
 @app.post("/API/editSapling", tags=["saplings"])
-def processUploadedSapling(req: editSaplingReq, x_access_key: Optional[str] = Header(None)):
-    cf.logmessage("getSaplings api call")
+def editSapling(req: editSaplingReq, x_access_key: Optional[str] = Header(None)):
+    cf.logmessage("editSapling api call")
     username, role = authenticate(x_access_key, allowed_roles=['admin','moderator','saplings_admin','saplings_entry'])
 
     # fetch existing sapling data
@@ -292,3 +304,22 @@ def processUploadedSapling(req: editSaplingReq, x_access_key: Optional[str] = He
         returnD = {'status': 'success', 'sapling_id': req.sapling_id}
     else:
         raise HTTPException(status_code=400, detail="Not able to update in DB")
+
+
+########################
+
+
+# smaller api call to get all confirmed saplings' id and name only for dropdown in Observations page
+@app.get("/API/getSaplingsList", tags=["saplings"])
+def getSaplingsList():
+    cf.logmessage("getSaplingsList api call")
+    returnD = {'status':'success'}
+
+    s1 = f"""select t1.id as sapling_id, t1.name as sapling_name
+    from saplings as t1
+    where t1.confirmed = 1
+    order by t1.name
+    """
+    list1 = dbconnect.makeQuery(s1, output='list')
+    returnD['saplings'] = list1
+    return returnD

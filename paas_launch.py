@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware # https://fastapi.tiangolo.com/tutorial/cors/
-from fastapi.middleware.gzip import GZipMiddleware # https://fastapi.tiangolo.com/advanced/middleware/
 from fastapi.staticfiles import StaticFiles # static html files deploying
+from brotli_asgi import BrotliMiddleware # https://github.com/fullonic/brotli-asgi
 
 app = FastAPI()
 
@@ -14,8 +14,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# enable gzip compression, from https://fastapi.tiangolo.com/advanced/middleware/
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+# enable Brotli compression. Better for json payloads, supported by most browsers. Fallback to gzip by default. from https://github.com/fullonic/brotli-asgi
+app.add_middleware(BrotliMiddleware)
 
 # can add modules having api calls below
 

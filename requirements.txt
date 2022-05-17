@@ -3,6 +3,7 @@ pymysql
 pandas
 fastapi
 uvicorn[standard]
-pycryptodomex
 python-multipart
 pillow
+brotli-asgi
+aiofiles

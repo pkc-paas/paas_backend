@@ -7,6 +7,7 @@ from fastapi import HTTPException, Header, File, UploadFile, Form
 import secrets, io, os
 import pandas as pd
 from PIL import Image, ImageOps
+from math import ceil
 
 from paas_launch import app
 import commonfuncs as cf
@@ -28,7 +29,7 @@ class viewObservations_payload(BaseModel):
     # action: str
 
 @app.post("/API/viewObservations", tags=["observations"])
-def viewObservations(req: viewObservations_payload, x_access_key: Optional[str] = Header(None)):
+def viewObservations(req: viewObservations_payload):
     cf.logmessage("viewObservations api call")
     
     # username, role = authenticate(x_access_key, allowed_roles=['admin','moderator'])
@@ -40,10 +41,10 @@ def viewObservations(req: viewObservations_payload, x_access_key: Optional[str] 
     date1 = cf.getDate()
 
     saplingsListSQL = cf.quoteNcomma(req.saplingsList)
-    s1 = f"""select * from observations where id in ({saplingsListSQL})
-    order by sapling_id, observation_date
+    s1 = f"""select * from observations where sapling_id in ({saplingsListSQL})
+    order by sapling_id, observation_date, created_on
     """
-    df1 = dbconnect.makeQuery(s1, output='df', noprint=False)
+    df1 = dbconnect.makeQuery(s1, output='df')
 
     returnD = {'status':'success'}
     if len(df1):
@@ -53,20 +54,95 @@ def viewObservations(req: viewObservations_payload, x_access_key: Optional[str] 
     return returnD
 
 
+@app.get("/API/listObservations", tags=["observations"])
+def listObservations(page: Optional[int] = 1, sapling_id: Optional[str]=None ):
+    cf.logmessage(f"listObservations api call, page: {page}")
+    if page < 1:
+        raise HTTPException(status_code=400, detail="Invalid page num")
+
+    pageSize = 50
+    returnD = {'status':'success'}
+    returnD['pageSize'] = pageSize
+
+    s2 = """select count(*) from observations"""
+    
+    if sapling_id:
+        print(f"Loading observations only for sapling_id = '{sapling_id}'")
+        whereClause = f"where t2.id = '{sapling_id}'"
+        s2 = f"""select count(*)
+        from observations
+        where sapling_id = '{sapling_id}'
+        """
+    else: 
+        whereClause = ''
+    
+    obsCount = dbconnect.makeQuery(s2, output='oneValue')
+
+    returnD['total_pages'] = ceil( obsCount / pageSize)
+
+
+    if (page > 1) and (page > returnD['total_pages']):
+        raise HTTPException(status_code=400, detail="exceeded pages")
+
+    # handle case where no observations
+    if obsCount == 0:
+        returnD['observations'] = []
+        returnD['saplingsLookup'] = {}
+        return returnD
+
+
+    s1 = f"""select t1.* , t2.name as sapling_name
+    from observations as t1 
+    left join saplings as t2
+    on t1.sapling_id = t2.id
+    {whereClause}
+    order by t1.observation_date desc
+    limit {(page-1)*pageSize},{pageSize}
+    """
+    df1 = dbconnect.makeQuery(s1, output='df')
+    returnD['observations'] = df1.to_dict(orient='records')
+
+
+    # get unique sapling ids list and fetch the location etc
+    saplingsList= df1['sapling_id'].unique().tolist()
+    saplingsListSQL = cf.quoteNcomma(saplingsList)
+    s2 = f"""select t1.*
+    from saplings as t1
+    where id in ({saplingsListSQL})
+    order by id
+    """
+    df2 = dbconnect.makeQuery(s2, output='df').set_index('id')
+
+    returnD['saplingsLookup'] = df2.to_dict(orient='index')
+
+    return returnD
+
 ############
 
 
 # instead of re-reading image from disk, taking the file pointer already loaded in memory.
-def compressObsImage(f, idf):
+def saveObsImage(f, idf):
     im = Image.open(f, mode='r')
-    im2 = ImageOps.fit(im, (150,200))
+    im1 = ImageOps.exif_transpose(im) # auto-rotate mobile photos. from https://stackoverflow.com/a/63798032/4355695
+    
+    # save thumbnail
+    im2 = ImageOps.fit(im1, (150,200))
     im2.save(os.path.join(observationsThumbnailsFolder, idf))
+
+    # save picture, but downsized to 2000x2000 dimensions (in case its big) to optimize storage
+    w, h = im1.size
+    if(h > 2000 or w > 2000):
+        im3 = ImageOps.contain(im1, (2000,2000))
+        im3.save(os.path.join(observationsFolder, idf))
+    else:
+        im1.save(os.path.join(observationsFolder, idf))
+
     return
 
 
 @app.post("/API/postObservation", tags=["observations"])
 def postObservation(
-        files: List[UploadFile] = File(...), 
+        uploadFiles: List[UploadFile] = File(...), 
         sapling_id: str = Form(...),
         observation_date: str = Form(...),
         growth_status: Optional[str] = Form(None),
@@ -77,7 +153,7 @@ def postObservation(
     # ref: https://github.com/tiangolo/fastapi/issues/854#issuecomment-573965912 for optional form fields etc
     cf.logmessage("postObservation api call")
 
-    # username, role = authenticate(x_access_key, allowed_roles=['admin','moderator','sponsor','saplings_admin','saplings_entry'])
+    username, role = authenticate(x_access_key, allowed_roles=['admin','moderator','sponsor','saplings_admin','saplings_entry'])
     
     # validations:
     s1 = f"select id from saplings where id='{sapling_id}'"
@@ -91,7 +167,7 @@ def postObservation(
     
     fileids = []
     oid = cf.makeUID()
-    for fN, file1 in enumerate(files):
+    for fN, file1 in enumerate(uploadFiles):
         filename = file1.filename
         extension = filename.split('.')[-1].lower()
         # validate extension
@@ -99,11 +175,11 @@ def postObservation(
             raise HTTPException(status_code=400, detail="Invalid files")
         
         idf = f"{oid}_{fN+1}.{extension}"
-        print(filename, idf)
-        with open(os.path.join(observationsFolder, idf),'wb') as f:
-            f.write(file1.file.read())
+        # print(filename, idf)
+        # with open(os.path.join(observationsFolder, idf),'wb') as f:
+        #     f.write(file1.file.read())
         
-        compressObsImage(file1.file, idf) # sending the file pointer and filename
+        saveObsImage(file1.file, idf) # sending the file pointer and filename
         fileids.append(idf)
 
     
@@ -121,8 +197,13 @@ def postObservation(
         iCols.append('description')
         iVals.append(f"'{description}'")
 
-    i1 = f"""insert into observations (id, sapling_id, photo_id, observation_date, created_on, {','.join(iCols)})
-    values ('{oid}', '{sapling_id}', '{','.join(fileids)}', '{observation_date}', CURRENT_TIMESTAMP, {','.join(iVals)})
+
+    columnsEnd = ''
+    if len(iCols): columnsEnd = f", {','.join(iCols)}"
+    valuesEnd = ''
+    if len(iVals): valuesEnd = f", {','.join(iVals)}"
+    i1 = f"""insert into observations (id, sapling_id, photo_id, observation_date, created_on {columnsEnd})
+    values ('{oid}', '{sapling_id}', '{','.join(fileids)}', '{observation_date}', CURRENT_TIMESTAMP {valuesEnd})
     """
     i1Count = dbconnect.execSQL(i1, noprint=False)
 
@@ -132,3 +213,33 @@ def postObservation(
 
 ############
 
+
+class saplingInfo4ObsReq(BaseModel):
+    sapling_id: str
+
+@app.post("/API/saplingInfo4Obs", tags=["observations"])
+def saplingInfo4Obs(req: saplingInfo4ObsReq):
+    cf.logmessage("saplingInfo4Obs api call")
+
+    # fetch existing sapling data
+    s1 = f"select * from saplings where id='{req.sapling_id}'"
+    saplingD = dbconnect.makeQuery(s1, output='oneJson')
+
+    if not len(saplingD):
+        raise HTTPException(status_code=400, detail="Sapling not found")
+
+    saplingD['past_observations'] = {}
+    s2 = f"""select id, observation_date from observations where sapling_id='{req.sapling_id}'
+    order by observation_date
+    """
+    df1 = dbconnect.makeQuery(s2, output='df')
+    if len(df1):
+        saplingD['past_observations']['num'] = len(df1)
+        saplingD['past_observations']['last_date'] = str(df1['observation_date'].tolist()[-1])
+    else:
+        saplingD['past_observations']['num'] = 0
+    
+    returnD = {'status':'success'}
+    returnD['sapling_data'] = saplingD
+
+    return returnD
