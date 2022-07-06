@@ -14,7 +14,7 @@ from fastapi import HTTPException, Header, File, UploadFile, Form
 
 import commonfuncs as cf
 from paas_launch import app
-from api_users import authenticate, findRole
+# from api_users import authenticate, findRole
 
 
 def makeAddress(emails):
@@ -39,7 +39,7 @@ def makeAddress(emails):
     return os.environ.get('EMAIL_SENDER','')
 
 
-def sendEmail(content, subject, recipients, cc=None):
+def sendEmail(content, subject, recipients, cc=None, html=None):
     '''
     Emailing function. 
     '''
@@ -50,11 +50,15 @@ def sendEmail(content, subject, recipients, cc=None):
     msg['To'] = makeAddress(recipients)
     if cc: msg['Cc'] = makeAddress(cc)
     msg.set_content(content)
+    
+    # adding html formatted body: from https://stackoverflow.com/a/58322776/4355695
+    if html:
+        msg.add_alternative(f"<!DOCTYPE html><html><body>{html}</body></html>", subtype = 'html')
 
     cf.logmessage('to:',msg['To'])
     # cf.logmessage('cc:',msg['Cc'])
-    cf.logmessage('subject:',msg['Subject'])
-    cf.logmessage(content)
+    # cf.logmessage('subject:',msg['Subject'])
+    # cf.logmessage(content)
     
     # login to server and send the actual email
     # try:    
@@ -69,17 +73,17 @@ def sendEmail(content, subject, recipients, cc=None):
     
 
 
-class emailTestReq(BaseModel):
-    recipients: List[str]
-    subject: str
-    content: str
-    cc: Optional[str] = None
+# class emailTestReq(BaseModel):
+#     recipients: List[str]
+#     subject: str
+#     content: str
+#     cc: Optional[str] = None
 
-@app.post("/API/emailTest", tags=["email"])
-def emailTest(req: emailTestReq, x_access_key: Optional[str] = Header(None)):
-    cf.logmessage("emailTest api call")
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+# @app.post("/API/emailTest", tags=["email"])
+# def emailTest(req: emailTestReq, x_access_key: Optional[str] = Header(None)):
+#     cf.logmessage("emailTest api call")
+#     username, role = authenticate(x_access_key, allowed_roles=['admin'])
     
-    status = sendEmail(req.content, req.subject, req.recipients, req.cc)
-    cf.logmessage(f"Email status: {status}")
-    return {'message':'success', 'status':status}
+#     status = sendEmail(req.content, req.subject, req.recipients, req.cc)
+#     cf.logmessage(f"Email status: {status}")
+#     return {'message':'success', 'status':status}

@@ -17,10 +17,10 @@ from api_users import authenticate
 
 root = os.path.dirname(__file__)
 observationsFolder = os.path.join(root, 'observation_files')
-os.makedirs(observationsFolder, exist_ok=True)
-
 observationsThumbnailsFolder = os.path.join(root, 'observation_thumbs')
-os.makedirs(observationsThumbnailsFolder, exist_ok=True)
+# os.makedirs(observationsFolder, exist_ok=True)
+# os.makedirs(observationsThumbnailsFolder, exist_ok=True)
+
 
 ###############
 

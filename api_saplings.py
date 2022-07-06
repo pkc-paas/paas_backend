@@ -17,8 +17,8 @@ root = os.path.dirname(__file__)
 
 saplingFolder = os.path.join(root, 'photos')
 saplingThumbFolder = os.path.join(root, 'sapling_thumbs')
-os.makedirs(saplingFolder, exist_ok=True)
-os.makedirs(saplingThumbFolder, exist_ok=True)
+# os.makedirs(saplingFolder, exist_ok=True)
+# os.makedirs(saplingThumbFolder, exist_ok=True)
 
 
 ####################
