@@ -27,16 +27,6 @@ def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("requestAdoption api call")
 
     username, role = authenticate(x_access_key, allowed_roles=['sponsor'])
-
-    # s1 = f"select username, role from users where token='{x_access_key}'"
-    # user = dbconnect.makeQuery(s1, output='oneJson')
-    # if not user:
-    #     cf.logmessage(f"rejected")
-    #     raise HTTPException(status_code=400, detail="Invalid login")
-
-    # if user.get('role','') != 'sponsor':
-    #     cf.logmessage(f"this is not a sponsor")
-    #     raise HTTPException(status_code=400, detail="Insufficient privileges")
     
     requested_sapling_ids = set([x.sapling_id for x in r.data])
     cf.logmessage('requested_sapling_ids:', requested_sapling_ids)

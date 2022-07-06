@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware # https://fastapi.tiangolo.com/tutorial/cors/
 from fastapi.staticfiles import StaticFiles # static html files deploying
 from brotli_asgi import BrotliMiddleware # https://github.com/fullonic/brotli-asgi
+import os
 
 app = FastAPI()
 
@@ -27,7 +28,22 @@ import api_sponsors
 import api_moderators
 import api_observations
 import api_email
+import api_events
 
+###########
+# STATIC files, uploads etc
+
+# create static folders if not existing
+root = os.path.dirname(__file__)
+folders = [
+    os.path.join(root, 'photos'),
+    os.path.join(root, 'sapling_thumbs'),
+    os.path.join(root, 'observation_files'),
+    os.path.join(root, 'observation_thumbs'),
+    os.path.join(root, 'uploads')
+]
+for f in folders:
+    os.makedirs(f, exist_ok=True)
 
 app.mount("/static/sapling_photos", StaticFiles(directory="photos", html = False), name="static")
 # https://fastapi.tiangolo.com/tutorial/static-files/
@@ -36,3 +52,5 @@ app.mount("/static/sapling_thumbs", StaticFiles(directory="sapling_thumbs", html
 
 app.mount("/static/observation_files", StaticFiles(directory="observation_files", html = False), name="static")
 app.mount("/static/observation_thumbs", StaticFiles(directory="observation_thumbs", html = False), name="static")
+
+app.mount("/static/files", StaticFiles(directory="uploads", html = False), name="static")

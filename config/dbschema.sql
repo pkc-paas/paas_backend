@@ -11,7 +11,10 @@ CREATE TABLE users(
 	remarks VARCHAR(255) NULL,
 	created_on DATETIME NULL,
 	created_by VARCHAR(32) NULL,
-	last_pw_change DATE NULL
+	last_pw_change DATE NULL,
+	referral_code VARCHAR(100) NULL,
+	creator_ip VARCHAR(20) NULL
+
 );
 CREATE INDEX users_i1 ON users (token);
 CREATE INDEX users_i2 ON users (role);
@@ -21,6 +24,7 @@ DROP TABLE IF EXISTS sessions;
 CREATE TABLE users(
 	token VARCHAR(50) NOT NULL PRIMARY KEY,
 	username VARCHAR(50) NOT NULL,
+	ip VARCHAR(20) NULL,
 	created_on DATETIME NULL
 );
 
@@ -121,4 +125,52 @@ CREATE TABLE species(
 );
 
 
+DROP TABLE IF EXISTS referral_codes;
+CREATE TABLE referral_codes(
+	referral_code VARCHAR(100) NOT NULL PRIMARY KEY,
+	valid_from DATETIME NULL,
+	valid_upto DATETIME NULL,
+	enabled BIT DEFAULT 0 NOT NULL,
+	created_on DATETIME NULL,
+	created_by VARCHAR(32) NULL,
+	modified_on DATETIME NULL,
+	modified_by VARCHAR(32) NULL
+);
+
+
+DROP TABLE IF EXISTS otps;
+CREATE TABLE otps(
+	txnid VARCHAR(100) NOT NULL PRIMARY KEY,
+	otp SMALLINT NULL,
+	purpose VARCHAR(32) NULL,
+	created_for VARCHAR(32) NULL,
+	created_on DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	ip VARCHAR(20) NULL,
+	matched_on DATETIME NULL,
+	validity SMALLINT NULL
+);
+
+
+DROP TABLE IF EXISTS events;
+CREATE TABLE events(
+	evid VARCHAR(10) NOT NULL PRIMARY KEY,
+	start_date DATE NULL,
+	end_date DATE NULL,
+	start_time TIME NULL,
+	end_time TIME NULL,
+	title VARCHAR(100) NULL,
+	description TEXT NULL,
+	files VARCHAR(500) NULL,
+	tags VARCHAR(100) NULL,
+	disabled BIT DEFAULT 0 NOT NULL,
+	highlight BIT DEFAULT 0 NOT NULL,
+	created_by VARCHAR(50) NULL,
+	created_on DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	modified_by VARCHAR(50) NULL,
+	modified_on DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	join_link VARCHAR(500) NULL,
+	location_addr VARCHAR(200) NULL,
+	lat DECIMAL(9,6) NULL,
+	lon DECIMAL(9,6) NULL
+);
 
