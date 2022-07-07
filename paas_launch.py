@@ -36,21 +36,21 @@ import api_events
 # create static folders if not existing
 root = os.path.dirname(__file__)
 folders = [
-    os.path.join(root, 'photos'),
-    os.path.join(root, 'sapling_thumbs'),
-    os.path.join(root, 'observation_files'),
-    os.path.join(root, 'observation_thumbs'),
-    os.path.join(root, 'uploads')
+    os.path.join(root, 'persistent_data', 'photos'),
+    os.path.join(root, 'persistent_data', 'sapling_thumbs'),
+    os.path.join(root, 'persistent_data', 'observation_files'),
+    os.path.join(root, 'persistent_data', 'observation_thumbs'),
+    os.path.join(root, 'persistent_data', 'uploads')
 ]
 for f in folders:
     os.makedirs(f, exist_ok=True)
 
-app.mount("/static/sapling_photos", StaticFiles(directory="photos", html = False), name="static")
+app.mount("/static/sapling_photos", StaticFiles(directory="persistent_data/photos", html = False), name="static")
 # https://fastapi.tiangolo.com/tutorial/static-files/
 # html=True is needed for defaulting to index.html. From https://stackoverflow.com/a/63805506/4355695
-app.mount("/static/sapling_thumbs", StaticFiles(directory="sapling_thumbs", html = False), name="static")
+app.mount("/static/sapling_thumbs", StaticFiles(directory="persistent_data/sapling_thumbs", html = False), name="static")
 
-app.mount("/static/observation_files", StaticFiles(directory="observation_files", html = False), name="static")
-app.mount("/static/observation_thumbs", StaticFiles(directory="observation_thumbs", html = False), name="static")
+app.mount("/static/observation_files", StaticFiles(directory="persistent_data/observation_files", html = False), name="static")
+app.mount("/static/observation_thumbs", StaticFiles(directory="persistent_data/observation_thumbs", html = False), name="static")
 
-app.mount("/static/files", StaticFiles(directory="uploads", html = False), name="static")
+app.mount("/static/files", StaticFiles(directory="persistent_data/uploads", html = False), name="static")

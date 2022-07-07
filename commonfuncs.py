@@ -7,7 +7,7 @@ print(root)
 timeOffset = 5.5
 maxThreads = 8
 
-logFolder = os.path.join(root,'logs')
+logFolder = os.path.join(root, 'persistent_data','logs')
 os.makedirs(logFolder, exist_ok=True)
 
 

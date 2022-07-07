@@ -77,7 +77,7 @@ def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
     
     status = dbconnect.addTable(df_eligible, 'adoptions')
     if not status:
-        df_eligible.to_csv('df_eligible_error.csv',index=False)
+        # df_eligible.to_csv('df_eligible_error.csv',index=False)
         raise HTTPException(status_code=400, detail="Could not add data to DB")
     
     returnD = {

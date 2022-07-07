@@ -26,3 +26,15 @@ nohup ./paas_server_launch.sh &
 
 http://localhost:8000/docs
 
+
+## Docker
+
+Build:
+```
+docker build -t paas_backend .
+```
+
+Run:
+```
+docker run --rm -it -p 5400:5400 --env-file dev.env -v persistent_data:/code/persistent_data paas_backend
+```

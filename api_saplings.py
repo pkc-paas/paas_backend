@@ -15,8 +15,8 @@ from api_users import authenticate, findRole
 
 root = os.path.dirname(__file__)
 
-saplingFolder = os.path.join(root, 'photos')
-saplingThumbFolder = os.path.join(root, 'sapling_thumbs')
+saplingFolder = os.path.join(root, 'persistent_data', 'photos')
+saplingThumbFolder = os.path.join(root, 'persistent_data', 'sapling_thumbs')
 # os.makedirs(saplingFolder, exist_ok=True)
 # os.makedirs(saplingThumbFolder, exist_ok=True)
 
@@ -202,8 +202,8 @@ def uploadSapling(
 # @app.get("/API/getPhoto", tags=["photos"])
 # def getPhoto(f: str):
 #     cf.logmessage("getPhoto api call")
-#     if os.path.isfile(os.path.join(root, 'photos', f)):
-#         return FileResponse(os.path.join(root, 'photos', f))
+#     if os.path.isfile(os.path.join(root, 'persistent_data', 'photos', f)):
+#         return FileResponse(os.path.join(root, 'persistent_data', 'photos', f))
 #     else:
 #         cf.logmessage(f"{f} not found")
 #         return {

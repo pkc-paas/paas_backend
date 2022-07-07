@@ -16,8 +16,8 @@ from api_users import authenticate
 
 
 root = os.path.dirname(__file__)
-observationsFolder = os.path.join(root, 'observation_files')
-observationsThumbnailsFolder = os.path.join(root, 'observation_thumbs')
+observationsFolder = os.path.join(root, 'persistent_data', 'observation_files')
+observationsThumbnailsFolder = os.path.join(root, 'persistent_data', 'observation_thumbs')
 # os.makedirs(observationsFolder, exist_ok=True)
 # os.makedirs(observationsThumbnailsFolder, exist_ok=True)
 
