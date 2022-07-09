@@ -234,13 +234,13 @@ def processUploadedSapling(req: processUploadedSaplingReq, x_access_key: Optiona
         u1 = f"update saplings set confirmed=1 where id = '{sapling_id}'"
         u1Count = dbconnect.execSQL(u1)
         if not u1Count:
-            raise HTTPException(status_code=400, detail="Not able to update in DB")
+            raise HTTPException(status_code=500, detail="Not able to update in DB")
 
     else:
         ui = f"update saplings set status='rejected' where id = '{sapling_id}'"
         u1Count = dbconnect.execSQL(u1)
         if not u1Count:
-            raise HTTPException(status_code=400, detail="Not able to update in DB")
+            raise HTTPException(status_code=500, detail="Not able to update in DB")
 
     returnD = {'status':'success'}
     return returnD
@@ -303,7 +303,7 @@ def editSapling(req: editSaplingReq, x_access_key: Optional[str] = Header(None))
     if u1Count == 1:
         returnD = {'status': 'success', 'sapling_id': req.sapling_id}
     else:
-        raise HTTPException(status_code=400, detail="Not able to update in DB")
+        raise HTTPException(status_code=500, detail="Not able to update in DB")
 
 
 ########################

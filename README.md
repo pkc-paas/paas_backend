@@ -36,5 +36,10 @@ docker build -t paas_backend .
 
 Run:
 ```
-docker run --rm -it -p 5400:5400 --env-file dev.env -v persistent_data:/code/persistent_data paas_backend
+docker run --rm -it -p 5400:5400 --env-file dev.env -v /fullpath/persistent_data:/code/persistent_data paas_backend
+```
+
+Run in background:
+```
+docker run -d -p 5400:5400 --env-file dev.env -v persistent_data:/code/persistent_data paas_backend
 ```

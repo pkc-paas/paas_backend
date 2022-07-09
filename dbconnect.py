@@ -17,7 +17,8 @@ dbcreds = {
     'DB_SERVER': os.environ.get('DB_SERVER',''),
     'DB_DATABASE': os.environ.get('DB_DATABASE',''),
     'DB_UID': os.environ.get('DB_UID',''),
-    'DB_PWD': os.environ.get('DB_PWD','')
+    'DB_PWD': os.environ.get('DB_PWD',''),
+    'DB_PORT': os.environ.get('DB_PORT','3306')
 }
 
 assert (dbcreds['DB_SERVER'] and dbcreds['DB_SERVER'] !=''), "DB credentials not loaded"
@@ -27,7 +28,7 @@ if absPath.startswith('/root/'):
     dbcreds['DB_SERVER'] = 'localhost'
     
 tsql1 = time.time()
-conn_str = f"mysql+pymysql://{dbcreds['DB_UID']}:{dbcreds['DB_PWD']}@{dbcreds['DB_SERVER']}/{dbcreds['DB_DATABASE']}"
+conn_str = f"mysql+pymysql://{dbcreds['DB_UID']}:{dbcreds['DB_PWD']}@{dbcreds['DB_SERVER']}:{dbcreds['DB_PORT']}/{dbcreds['DB_DATABASE']}"
 sqlEngine = sqlalchemy.create_engine(conn_str,echo=False, pool_recycle=1)
 tsql2 = time.time()
 cf.logmessage(f"Connected to SQL in {round(tsql2-tsql1,3)} secs")

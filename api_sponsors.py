@@ -78,7 +78,7 @@ def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
     status = dbconnect.addTable(df_eligible, 'adoptions')
     if not status:
         # df_eligible.to_csv('df_eligible_error.csv',index=False)
-        raise HTTPException(status_code=400, detail="Could not add data to DB")
+        raise HTTPException(status_code=500, detail="Could not add data to DB")
     
     returnD = {
         "message": "success", 
@@ -103,21 +103,16 @@ def mySaplings(req: mySaplingsReq , x_access_key: Optional[str] = Header(None)):
     Get all saplings adopted by a user and optionally their observations
     """
     cf.logmessage("mySaplings api call")
-    s1 = f"select username, role from users where token='{x_access_key}'"
-    user = dbconnect.makeQuery(s1, output='oneJson')
-    if not user:
-        cf.logmessage(f"rejected")
-        raise HTTPException(status_code=400, detail="Invalid login")
+    username, role = authenticate(x_access_key, allowed_roles=['sponsor','admin','moderator'])
 
-    cf.logmessage(f"user: {user['username']}, role: {user['role']}")
-    print("observations:",req.observations)
+    # print("observations:",req.observations)
 
-    if user.get('role','') == 'sponsor':
-        sponsor_username = user.get('username')
+    if role == 'sponsor':
+        sponsor_username = username
     else:
         # constrain which roles allowed to do this
-        if user.get('role','') not in ('moderator','admin'):
-            raise HTTPException(status_code=400, detail="Insufficient privileges")
+        # if role not in ('moderator','admin'):
+        #     raise HTTPException(status_code=400, detail="Insufficient privileges")
 
         if not req.sponsor_username:
             raise HTTPException(status_code=400, detail="Missing sponsor_username")
@@ -144,10 +139,11 @@ def mySaplings(req: mySaplingsReq , x_access_key: Optional[str] = Header(None)):
         "saplings": df1.to_dict(orient='records')
     }
     if not len(df1):
-        returnD['message'] = f"This sponsor {user['username']} doesn't have any approved adopted saplings yet."
+        returnD['message'] = f"This sponsor {username} doesn't have any approved adopted saplings yet."
         return returnD
 
     if req.observations:
+        cf.logmessage("Fetching observations also")
         sapling_ids = df1['sapling_id'].unique()
         sapling_ids_SQL = cf.quoteNcomma(sapling_ids)
         s3 = f"""select t1.* from observations as t1

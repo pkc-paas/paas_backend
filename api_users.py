@@ -40,11 +40,11 @@ def authenticate(token, allowed_roles=['admin']):
     user = dbconnect.makeQuery(s1, output='oneJson', printit=False)
     if not user:
         cf.logmessage(f"rejected")
-        raise HTTPException(status_code=400, detail="Invalid login")
+        raise HTTPException(status_code=401, detail="Invalid login")
     if len(allowed_roles):
         if user.get('role') not in allowed_roles:
-            cf.logmessage(f"Insufficient privileges")
-            raise HTTPException(status_code=400, detail="Insufficient privileges")
+            cf.logmessage(f"Insufficient permissions")
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
     return user['username'], user['role']
 
 
@@ -74,12 +74,12 @@ def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     s1 = f"select email, username, pwd from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
-        raise HTTPException(status_code=400, detail="Invalid username")
+        raise HTTPException(status_code=401, detail="Invalid username")
     
     # check password
     if not decrypt(row['pwd'], r.pw):
         cf.logmessage(f"rejected")
-        raise HTTPException(status_code=400, detail="Invalid login")
+        raise HTTPException(status_code=401, detail="Invalid login")
     
     if not X_Forwarded_For: 
         X_Forwarded_For = ''
@@ -114,11 +114,11 @@ def changepw(r: changePwBody, X_Forwarded_For: Optional[str] = Header(None)):
     s1 = f"select * from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
-        raise HTTPException(status_code=400, detail="Invalid username")
+        raise HTTPException(status_code=401, detail="Invalid username")
     
     if not decrypt(row['pwd'], r.oldpw):
         cf.logmessage(f"rejected")
-        raise HTTPException(status_code=400, detail="Invalid login")
+        raise HTTPException(status_code=401, detail="Invalid login")
 
     new_password = encrypt(r.newpw)
     u1 = f"""update users
@@ -186,7 +186,7 @@ def createUser(req: createUser_payload, x_access_key: Optional[str] = Header(Non
     s1 = f"select username from users where username = '{req.username}'"
     exist = dbconnect.makeQuery(s1, output="oneValue")
     if exist:
-        raise HTTPException(status_code=400, detail="This username is already taken")
+        raise HTTPException(status_code=406, detail="This username is already taken")
         
     hash_string = encrypt(req.pwd)
     i1 = f"""insert into users (username, email, role, pwd, fullname, created_by, created_on) values
@@ -202,7 +202,7 @@ def createUser(req: createUser_payload, x_access_key: Optional[str] = Header(Non
         returnD['added_count'] = iCount
         return returnD
     else:
-        raise HTTPException(status_code=400, detail="Failed to insert new user entry")
+        raise HTTPException(status_code=500, detail="Failed to insert new user entry")
 
 
 ########################
@@ -269,7 +269,7 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
     c1 = f"select count(username) from users where username='{req.username}'"
     existing = dbconnect.makeQuery(c1)
     if existing != 0:
-        raise HTTPException(status_code=400, detail="This username already exists in the system, please use another")
+        raise HTTPException(status_code=406, detail="This username already exists in the system, please use another")
 
     global rolesList
     if req.role not in rolesList:
@@ -285,7 +285,7 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
         s2 = f"select count(email) from users where email = '{req.email}' and status in ('APPROVED','APPLIED')"
         emailCount = dbconnect.makeQuery(s2, output='oneValue')
         if emailCount:
-            raise HTTPException(status_code=400, detail="This email is already registered")
+            raise HTTPException(status_code=406, detail="This email is already registered")
 
 
 
@@ -342,7 +342,7 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
     """
     i1Count = dbconnect.execSQL(i1)
     if not i1Count:
-        raise HTTPException(status_code=400, detail="Unable to create entry in DB, please contact Admin")
+        raise HTTPException(status_code=500, detail="Unable to create entry in DB, please contact Admin")
 
     returnD = {'status':'success'}
 
@@ -399,7 +399,7 @@ def forgotPw_trigger(username, X_Forwarded_For: Optional[str] = Header(None)):
     i1Count = dbconnect.execSQL(i1)
     if not i1Count:
         cf.logmessage("Warning: Unable to insert into otps table")
-        raise HTTPException(status_code=400, detail="Sorry, could not trigger OTP for some reason; pls try again after 10 mins or contact admin.")
+        raise HTTPException(status_code=500, detail="Sorry, could not trigger OTP for some reason; pls try again after 10 mins or contact admin.")
 
     # trigger OTP email
     subject = f"{otp} is the OTP for ConnecTree password reset for user {username}"
@@ -415,7 +415,6 @@ def forgotPw_trigger(username, X_Forwarded_For: Optional[str] = Header(None)):
         cf.logmessage(status)
         cf.logmessage("Warning: Might have been unable to send OTP email, printing in logs and proceeding")
         cf.logmessage(f"user: {username}, txnid: {txnid}, OTP:{otp}")
-        # raise HTTPException(status_code=400, detail=f"Sorry, could not email the OTP for some reason; pls try again after 10 mins or contact admin. Transaction id: {txnid}")        
     
     return {'txnid': txnid, 'otpMethod': 'email' }
 
@@ -453,7 +452,7 @@ def forgotPw_trigger(req: resetPw_payload, X_Forwarded_For: Optional[str] = Head
     # row['created_on'] is already in pandas timestamp format, can be used as datetime obj
     tdiff = (datetime.datetime.utcnow() - row['created_on']).total_seconds()/60
     if tdiff > row['validity']:
-        raise HTTPException(status_code=400, detail=f"Sorry, the OTP has expired. Please trigger again.")
+        raise HTTPException(status_code=401, detail=f"Sorry, the OTP has expired. Please trigger again.")
     
     # ok all clear now. Validate new pw
     # to do - validation by chars etc
@@ -468,3 +467,26 @@ def forgotPw_trigger(req: resetPw_payload, X_Forwarded_For: Optional[str] = Head
     # to do: formality: send another email
 
     return {'status':'success'}
+
+
+###############
+
+class approveUsers_payload(BaseModel):
+    usersList: List[str]
+
+@app.post("/API/approveUsers", tags=["users"])
+def listUsers(req: approveUsers_payload, x_access_key: Optional[str] = Header(...)):
+    cf.logmessage("approveUsers api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+
+    usersListSQL = cf.quoteNcomma(req.usersList)
+    u1 = f"""update users
+    set status = 'APPROVED'
+    where username in ({usersListSQL})
+    and ( status = 'APPLIED'
+    or status is NULL) """
+
+    u1Count = dbconnect.execSQL(u1)
+
+    returnD =  {'status':'success', 'count':u1Count }
+    return returnD

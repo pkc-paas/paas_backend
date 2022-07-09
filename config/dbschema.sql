@@ -7,21 +7,20 @@ CREATE TABLE users(
 	last_login DATETIME NULL,
 	pwd VARCHAR(100) NULL,
 	fullname VARCHAR(50) NULL,
-	status VARCHAR(32) NULL,
+	`status` VARCHAR(32) NULL,
 	remarks VARCHAR(255) NULL,
 	created_on DATETIME NULL,
 	created_by VARCHAR(32) NULL,
 	last_pw_change DATE NULL,
 	referral_code VARCHAR(100) NULL,
 	creator_ip VARCHAR(20) NULL
-
 );
 CREATE INDEX users_i1 ON users (token);
 CREATE INDEX users_i2 ON users (role);
 
 
 DROP TABLE IF EXISTS sessions;
-CREATE TABLE users(
+CREATE TABLE sessions(
 	token VARCHAR(50) NOT NULL PRIMARY KEY,
 	username VARCHAR(50) NOT NULL,
 	ip VARCHAR(20) NULL,
@@ -39,9 +38,9 @@ CREATE TABLE saplings(
 	local_name VARCHAR(100) NULL,
 	botanical_name VARCHAR(100) NULL,
 	planted_date DATE NULL,
-	data_collection_date DATE NULL
-	status VARCHAR(50) NULL,
-	description TEXT NULL,
+	data_collection_date DATE NULL,
+	`status` VARCHAR(50) NULL,
+	`description` TEXT NULL,
 	details TEXT NULL,
 	first_photos VARCHAR(500) NULL,
 	confirmed BOOLEAN NULL,
@@ -55,7 +54,7 @@ CREATE TABLE saplings(
 	CONSTRAINT saplings_c1 UNIQUE (lat, lon)
 );
 CREATE INDEX saplings_i1 ON saplings (planted_date);
-CREATE INDEX saplings_i2 ON saplings (status);
+CREATE INDEX saplings_i2 ON saplings (`status`);
 CREATE INDEX saplings_i3 ON saplings (confirmed);
 CREATE INDEX saplings_i4 ON saplings (`group`);
 CREATE INDEX saplings_i5 ON saplings (name);
@@ -68,7 +67,7 @@ CREATE TABLE adoptions(
 	sapling_id VARCHAR(36) NULL,
 	adopted_name VARCHAR(32) NULL,
 	comments VARCHAR(255) NULL,
-	status VARCHAR(32) NULL,
+	`status` VARCHAR(32) NULL,
 	approver VARCHAR(32) NULL,
 	application_date DATE NULL,
 	approval_date DATE NULL,
@@ -80,7 +79,7 @@ CREATE TABLE adoptions(
 );
 CREATE INDEX adoptions_i1 ON adoptions (username);
 CREATE INDEX adoptions_i2 ON adoptions (sapling_id);
-CREATE INDEX adoptions_i3 ON adoptions (status);
+CREATE INDEX adoptions_i3 ON adoptions (`status`);
 CREATE INDEX adoptions_i4 ON adoptions (approver);
 CREATE INDEX adoptions_i5 ON adoptions (application_date);
 CREATE INDEX adoptions_i6 ON adoptions (approval_date);
@@ -94,7 +93,7 @@ CREATE TABLE observations(
 	observation_date DATE NULL,
 	growth_status VARCHAR(200) NULL,
 	health_status VARCHAR(200) NULL,
-	description VARCHAR(500) NULL,
+	`description` VARCHAR(500) NULL,
 	confirmed BOOLEAN NULL,
 	created_on DATETIME NULL,
 	created_by VARCHAR(32) NULL,
@@ -111,7 +110,7 @@ CREATE TABLE species(
 	id VARCHAR(10) NOT NULL PRIMARY KEY,
 	local_name VARCHAR(100) NULL,
 	botanical_name VARCHAR(100) NULL,
-	description VARCHAR(500) NULL,
+	`description` VARCHAR(500) NULL,
 	economic VARCHAR(100) NULL,
 	phenology VARCHAR(100) NULL,
 	flowering VARCHAR(100) NULL,
@@ -159,7 +158,7 @@ CREATE TABLE events(
 	start_time TIME NULL,
 	end_time TIME NULL,
 	title VARCHAR(100) NULL,
-	description TEXT NULL,
+	`description` TEXT NULL,
 	files VARCHAR(500) NULL,
 	tags VARCHAR(100) NULL,
 	disabled BIT DEFAULT 0 NOT NULL,
