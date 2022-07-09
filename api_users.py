@@ -71,7 +71,7 @@ class loginRBody(BaseModel):
 @app.post("/API/login", tags=["users"])
 def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage(f"login POST api call")
-    s1 = f"select email, username, pwd from users where username='{r.username}'"
+    s1 = f"select email, username, pwd, status from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
         raise HTTPException(status_code=401, detail="Invalid username")
@@ -83,6 +83,10 @@ def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     
     if not X_Forwarded_For: 
         X_Forwarded_For = ''
+
+    if row['status']:
+        if row['status'] not in ('APPROVED'):
+            raise HTTPException(status_code=403, detail="User is not approved yet")
 
     cf.logmessage(f"user {row['username']} authenticated")
     token = secrets.token_urlsafe(25)
@@ -490,3 +494,28 @@ def listUsers(req: approveUsers_payload, x_access_key: Optional[str] = Header(..
 
     returnD =  {'status':'success', 'count':u1Count }
     return returnD
+
+
+#######
+
+class revertUsers_payload(BaseModel):
+    usersList: List[str]
+
+@app.post("/API/revertUsers", tags=["users"])
+def listUsers(req: revertUsers_payload, x_access_key: Optional[str] = Header(...)):
+    cf.logmessage("revertUsers api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+
+    usersListSQL = cf.quoteNcomma(req.usersList)
+    u1 = f"""update users
+    set status = 'APPLIED'
+    where username in ({usersListSQL})
+    and ( status = 'APPROVED'
+    or status is NULL) """
+
+    u1Count = dbconnect.execSQL(u1)
+
+    returnD =  {'status':'success', 'count':u1Count }
+    return returnD
+
+    
