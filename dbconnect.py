@@ -29,6 +29,7 @@ if absPath.startswith('/root/'):
     
 tsql1 = time.time()
 conn_str = f"mysql+pymysql://{dbcreds['DB_UID']}:{dbcreds['DB_PWD']}@{dbcreds['DB_SERVER']}:{dbcreds['DB_PORT']}/{dbcreds['DB_DATABASE']}"
+# print(conn_str)
 sqlEngine = sqlalchemy.create_engine(conn_str,echo=False, pool_recycle=1)
 tsql2 = time.time()
 cf.logmessage(f"Connected to SQL in {round(tsql2-tsql1,3)} secs")
