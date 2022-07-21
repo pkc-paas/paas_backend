@@ -69,11 +69,18 @@ def makeQuery(s1, output='oneValue', lowerCaseColumns=False, keepCols=True, fill
         c.close()
         return result
     elif output in ['df','list','oneJson','column']:
-        # df
-        if fillna:
-            df = pd.read_sql_query(s1, con=c, coerce_float=False).fillna('') 
-        else:
-            df = pd.read_sql_query(s1, con=c, coerce_float=False)
+        
+        try:
+            if fillna:
+                df = pd.read_sql_query(s1, con=c, coerce_float=False).fillna('') 
+            else:
+                df = pd.read_sql_query(s1, con=c, coerce_float=False)
+        except sqlalchemy.exc.OperationalError as e:
+            cf.logmessage(f"DB OperationalError for query")
+            if not printit: cf.logmessage(' '.join(s1.strip().split()))
+            cf.logmessage(e)
+            c.close()
+            raise
         # coerce_float : need to ensure mobiles aren't screwed
         c.close()
         

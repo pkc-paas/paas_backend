@@ -29,6 +29,7 @@ import api_moderators
 import api_observations
 import api_email
 import api_events
+import api_species
 
 ###########
 # STATIC files, uploads etc

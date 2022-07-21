@@ -91,7 +91,7 @@ def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage(f"user {row['username']} authenticated")
     token = secrets.token_urlsafe(25)
     i1 = f"""insert into sessions (token, username, ip, created_on) values 
-    ('{token}','{row['username']}', '{X_Forwarded_For}', CURRENT_TIMESTAMP)
+    ('{token}','{row['username']}', '{X_Forwarded_For[:50]}', CURRENT_TIMESTAMP)
     """
     iCount = dbconnect.execSQL(i1)
     
@@ -340,7 +340,7 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
     if not X_Forwarded_For:
         X_Forwarded_For = ''
     iCols.append('creator_ip')
-    iVals.append(f"'{X_Forwarded_For}'")
+    iVals.append(f"'{X_Forwarded_For[:50]}'")
 
     i1 = f"""insert into users ({','.join(iCols)}) values ({','.join(iVals)})
     """
@@ -398,7 +398,7 @@ def forgotPw_trigger(username, X_Forwarded_For: Optional[str] = Header(None)):
         X_Forwarded_For = ''
 
     i1 = f"""insert into otps (txnid, otp, created_for, purpose, validity, ip) values (
-    '{txnid}', {otp}, '{username}', 'forgotPw', {validity}, '{X_Forwarded_For}'
+    '{txnid}', {otp}, '{username}', 'forgotPw', {validity}, '{X_Forwarded_For[:50]}'
     )"""
     i1Count = dbconnect.execSQL(i1)
     if not i1Count:
