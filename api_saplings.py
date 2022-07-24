@@ -61,6 +61,10 @@ def getSaplings(r: saplingReq, x_access_key: Optional[str] = Header(None)):
     # create a combined column for searching
     df1['search'] = df1.fillna('').apply(lambda x: f"{x['name']} {x['id']} {x['group']} {x['local_name']} {x['botanical_name']} {x['adopted_name']}", axis=1)
 
+    # print(df1['confirmed'])
+
+    # df1.drop(['id', 'lat', 'lon', 'name', 'group', 'local_name', 'botanical_name', 'planted_date', 'data_collection_date', 'description', 'first_photos', 'height', 'canopy', 'girth_1m', 'adopted_name', 'adoption_status', 'search'], axis=1, inplace=True)
+
     # split it
     df_confirmed = df1[df1['confirmed']==1]
     df_unconfirmed = df1[df1['confirmed']!=1]
@@ -236,11 +240,14 @@ def processUploadedSapling(req: processUploadedSaplingReq, x_access_key: Optiona
         if not u1Count:
             raise HTTPException(status_code=500, detail="Not able to update in DB")
 
+
     else:
-        ui = f"update saplings set status='rejected' where id = '{sapling_id}'"
+        u1 = f"update saplings set status='rejected' where id = '{sapling_id}'"
         u1Count = dbconnect.execSQL(u1)
         if not u1Count:
             raise HTTPException(status_code=500, detail="Not able to update in DB")
+        # else:
+            # to do: remove attached images - or do cleanup tasks later
 
     returnD = {'status':'success'}
     return returnD
