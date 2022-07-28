@@ -518,4 +518,40 @@ def listUsers(req: revertUsers_payload, x_access_key: Optional[str] = Header(...
     returnD =  {'status':'success', 'count':u1Count }
     return returnD
 
+#######
+
+class changeRole_payload(BaseModel):
+    usersList: List[str]
+    role: str
+
+@app.post("/API/changeRole", tags=["users"])
+def changeRole(req: changeRole_payload, x_access_key: Optional[str] = Header(...)):
+    cf.logmessage("changeRole api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+
+    global rolesList
+    if req.role not in rolesList:
+        cf.logmessage("Invalid role")
+        raise HTTPException(status_code=400, detail="Invalid role")
     
+    usersListSQL = cf.quoteNcomma(req.usersList)
+
+    u1 = f"""update users
+    set role = '{req.role}'
+    where username in ({usersListSQL})
+    """
+    u1Count = dbconnect.execSQL(u1)
+
+    returnD =  {'status':'success', 'count':u1Count }
+    return returnD
+
+#####
+
+@app.get("/API/getRoles", tags=["users"])
+def getRoles(x_access_key: Optional[str] = Header(...)):
+    cf.logmessage("getRoles api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+
+    global rolesList
+    returnD = {'status':'success', 'roles': rolesList}
+    return returnD
