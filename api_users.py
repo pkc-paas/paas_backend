@@ -555,3 +555,46 @@ def getRoles(x_access_key: Optional[str] = Header(...)):
     global rolesList
     returnD = {'status':'success', 'roles': rolesList}
     return returnD
+
+##############
+
+
+class deleteUsers_payload(BaseModel):
+    usersList: List[str]
+
+@app.post("/API/deleteUsers", tags=["users"])
+def listUsers(req: deleteUsers_payload, x_access_key: Optional[str] = Header(...)):
+    cf.logmessage("deleteUsers api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+
+    # validations
+    usersList1 = [x for x in req.usersList if x not in (username, 'nikhil_admin','admin1')]
+
+    if not len(usersList1):
+        raise HTTPException(status_code=400, detail="No applicable users to delete")
+
+    usersListSQL1 = cf.quoteNcomma(usersList1)
+    
+    # first fetch the users data
+    s1 = f"""select username, email, role, `status`, fullname 
+    from users
+    where username in ({usersListSQL1})
+    and `status` != 'APPROVED'
+    order by username
+    """
+    df1 = dbconnect.makeQuery(s1)
+
+    if not len(df1):
+        cf.logmessage("No non-APPROVED users to delete")
+        raise HTTPException(status_code=400, detail="No non-APPROVED users to delete")
+    
+    usersList2 = df1['username'].tolist()
+    usersListSQL2 = cf.quoteNcomma(usersList2)
+
+    d1 = f"""delete from users
+    where username in ({usersListSQL2})
+    """
+    d1Count = dbconnect.execSQL(d1)
+
+    returnD =  {'status':'success', 'count':d1Count }
+    return returnD
