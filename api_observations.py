@@ -64,17 +64,23 @@ def listObservations(page: Optional[int] = 1, sapling_id: Optional[str]=None ):
     returnD = {'status':'success'}
     returnD['pageSize'] = pageSize
 
-    s2 = """select count(*) from observations"""
-    
     if sapling_id:
-        print(f"Loading observations only for sapling_id = '{sapling_id}'")
         whereClause = f"where t2.id = '{sapling_id}'"
-        s2 = f"""select count(*)
-        from observations
-        where sapling_id = '{sapling_id}'
-        """
     else: 
         whereClause = ''
+
+    if page == 1:
+        # only do the extra work of finding total num of records if first page.
+        s2 = """select count(*) from observations"""
+    
+        if sapling_id:
+            whereClause = f"where t2.id = '{sapling_id}'"
+            s2 = f"""select count(*)
+            from observations
+            where sapling_id = '{sapling_id}'
+            """
+        else: 
+            whereClause = ''
     
     obsCount = dbconnect.makeQuery(s2, output='oneValue')
 

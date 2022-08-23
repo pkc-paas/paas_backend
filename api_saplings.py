@@ -318,8 +318,10 @@ def editSapling(req: editSaplingReq, x_access_key: Optional[str] = Header(None))
 
 # smaller api call to get all confirmed saplings' id and name only for dropdown in Observations page
 @app.get("/API/getSaplingsList", tags=["saplings"])
-def getSaplingsList():
+def getSaplingsList(withObs: Optional[str] = 'N', x_access_key: Optional[str] = Header(None)):
     cf.logmessage("getSaplingsList api call")
+    username, role = authenticate(x_access_key, allowed_roles=['admin','moderator','saplings_admin','saplings_entry'])
+
     returnD = {'status':'success'}
 
     s1 = f"""select t1.id as sapling_id, t1.name as sapling_name
@@ -327,8 +329,17 @@ def getSaplingsList():
     where t1.confirmed = 1
     order by t1.name
     """
-    list1 = dbconnect.makeQuery(s1, output='list')
-    returnD['saplings'] = list1
+    df1 = dbconnect.makeQuery(s1, output='df')
+
+    # in case withObs = Y
+    cf.logmessage(f"withObs: {withObs}")
+    if withObs.upper() == 'Y':
+        s2 = f"""select distinct sapling_id from observations"""
+        obs_saplings = dbconnect.makeQuery(s2, output='column')
+        # now filter df1 by these values
+        df1 = df1[df1['sapling_id'].isin(obs_saplings)].copy()
+
+    returnD['saplings'] = df1.to_dict(orient='records')
     return returnD
 
 
