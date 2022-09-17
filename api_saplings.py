@@ -346,3 +346,23 @@ def getSaplingsList(withObs: Optional[str] = 'N', x_access_key: Optional[str] = 
 
 ########################
 
+# another smaller api call to get saplings data for display in saplings upload form
+
+@app.get("/API/saplingsPreview", tags=["saplings"])
+def saplingsPreview():
+    cf.logmessage("saplingsPreview api call")
+
+    returnD = {'status':'success'}
+
+    # cols = """id, lat, lon, name, planted_date,
+    # `group`, `status`, confirmed, first_photos, 
+    # local_name, botanical_name"""
+    cols = """id, lat, lon, name, planted_date"""
+    
+    s1 = f"""select {cols} from saplings"""
+    df1 = dbconnect.makeQuery(s1, output='df')
+
+    # make into csv for min payload size
+    returnD['data'] = df1.to_csv(index=False)
+    return returnD
+
