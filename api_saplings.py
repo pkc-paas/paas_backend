@@ -192,8 +192,14 @@ def uploadSapling(
         iCols.append('girth_1m')
         iVals.append(f"{girth_1m}")
 
+    # auto-confirm for admins and saplings_admin users
+    if role in ('admin', 'saplings_admin'):
+        confirmed = 1
+    else:
+        confirmed = 0
+    
     i1 = f"""insert into saplings (id, name, lat, lon, data_collection_date, first_photos, created_on, created_by, confirmed, {','.join(iCols)})
-    values ('{sid}', '{name}', {lat},{lon}, '{data_collection_date}', '{','.join(fileids)}', CURRENT_TIMESTAMP, '{username}', 0, {','.join(iVals)})
+    values ('{sid}', '{name}', {lat},{lon}, '{data_collection_date}', '{','.join(fileids)}', CURRENT_TIMESTAMP, '{username}', {confirmed}, {','.join(iVals)})
     """
     i1Count = dbconnect.execSQL(i1, noprint=False)
 
