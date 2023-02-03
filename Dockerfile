@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY . /code
 
-CMD ["uvicorn","paas_launch:app", "--host", "0.0.0.0", "--port", "5400", "--root-path", "/paas_backend"]
+CMD ["uvicorn","paas_launch:app", "--host", "0.0.0.0", "--port", "5400", "--root-path", "/connectree_backend"]

@@ -1,47 +1,33 @@
-# dbconnect.py
-CHUNKSIZE = 10000
+# dbonnect.py
 
-import urllib.parse # urljoin
-import sqlalchemy
-# requires pymysql so keep that installed
+import psycopg2, json, sys, os, time, datetime
+from psycopg2 import pool, IntegrityError, extras
 import pandas as pd
-import os, json, time
+from pandas.io.sql import DatabaseError
 
 import commonfuncs as cf
 
-root = os.path.dirname(__file__) # needed for tornado
-absPath = os.path.realpath(__file__)
-
-# initiate DB connection
-dbcreds = { 
-    'DB_SERVER': os.environ.get('DB_SERVER',''),
-    'DB_DATABASE': os.environ.get('DB_DATABASE',''),
-    'DB_UID': os.environ.get('DB_UID',''),
-    'DB_PWD': os.environ.get('DB_PWD',''),
-    'DB_PORT': os.environ.get('DB_PORT','3306')
+# 2022-12-19: adopting different db connection way from https://github.com/DavidLacroix/postgis-mvt/blob/master/webapp/app.py
+DB_PARAMETERS = {
+    'host': os.environ.get('DB_SERVER',''),
+    'port': int( os.environ.get('DB_PORT','') ),
+    'database': os.environ.get('DB_DATABASE',''),
+    'user': os.environ.get('DB_USER',''),
+    'password': os.environ.get('DB_PW',''),
+    'cursor_factory': extras.RealDictCursor
 }
 
-assert (dbcreds['DB_SERVER'] and dbcreds['DB_SERVER'] !=''), "DB credentials not loaded"
+assert len(DB_PARAMETERS['password']) > 2, "Invalid DB connection password" 
 
-if absPath.startswith('/root/'):
-    cf.logmessage('running on server so localhost')
-    dbcreds['DB_SERVER'] = 'localhost'
-    
-tsql1 = time.time()
-conn_str = f"mysql+pymysql://{dbcreds['DB_UID']}:{dbcreds['DB_PWD']}@{dbcreds['DB_SERVER']}:{dbcreds['DB_PORT']}/{dbcreds['DB_DATABASE']}"
-# print(conn_str)
-sqlEngine = sqlalchemy.create_engine(conn_str,echo=False, pool_recycle=1)
-tsql2 = time.time()
-cf.logmessage(f"Connected to SQL in {round(tsql2-tsql1,3)} secs")
+threaded_postgreSQL_pool = psycopg2.pool.ThreadedConnectionPool(5, 20, **DB_PARAMETERS)
+assert threaded_postgreSQL_pool, "Could not create DB connection"
 
+cf.logmessage("DB Connected")
 
-# Generic SQL query handling functions
-
-def makeQuery(s1, output='oneValue', lowerCaseColumns=False, keepCols=True, fillna=True, printit=False):
+def makeQuery(s1, output='df', lowerCaseColumns=False, fillna=True, engine=None, noprint=False):
     '''
     output choices:
     oneValue : ex: select count(*) from table1 (output will be only one value)
-    oneRow : ex: select * from table1 where id='A' (output will be onle one row)
     df: ex: select * from users (output will be a table)
     list: json array, like df.to_dict(orient='records')
     column: first column in output as a list. ex: select username from users
@@ -54,129 +40,118 @@ def makeQuery(s1, output='oneValue', lowerCaseColumns=False, keepCols=True, fill
         cf.logmessage("; not allowed")
         return False
 
-    if printit:
-        cf.logmessage(' '.join(s1.strip().split()))
+    if not noprint:
+        # keeping auth check and some other queries out
+        skipPrint = ['where token=', '.STArea()', 'STGeomFromText']
+        if not any([(x in s1) for x in skipPrint]) : 
+            cf.logmessage(f"Query: {' '.join(s1.split())}")
+        else: 
+            cf.logmessage(f"Query: {' '.join(s1.split())[:20]}")
 
-    global sqlEngine
-    c = sqlEngine.connect()
-    if output == 'oneValue':
-        result = c.execute(s1).fetchone()
-        c.close()
-        if not result: return None
-        return result[0]
-    elif output == 'oneRow':
-        result = c.execute(s1).fetchone()
-        c.close()
-        return result
-    elif output in ['df','list','oneJson','column']:
-        
-        try:
-            if fillna:
-                df = pd.read_sql_query(s1, con=c, coerce_float=False).fillna('') 
+    ps_connection = threaded_postgreSQL_pool.getconn()
+
+    result = None # default return value
+
+    if output in ('oneValue','oneJson'):
+        ps_cursor = ps_connection.cursor()
+        ps_cursor.execute(s1)
+        row = ps_cursor.fetchone()
+        ps_cursor.close()
+        if not row: 
+            result = None
+        else:
+            if output == 'oneValue':
+                result = list(row.values())[0]
             else:
-                df = pd.read_sql_query(s1, con=c, coerce_float=False)
-        except sqlalchemy.exc.OperationalError as e:
-            cf.logmessage(f"DB OperationalError for query")
-            if not printit: cf.logmessage(' '.join(s1.strip().split()))
+                result = dict(row)
+        
+        
+    elif output in ('df','list','column'):
+        try:
+            ps_cursor = ps_connection.cursor()
+            ps_cursor.execute(s1)
+            res = ps_cursor.fetchall()
+            ps_cursor.close()
+            if fillna:
+                df = pd.DataFrame(res).fillna('')
+            else:
+                df = pd.DataFrame(res)
+        except DatabaseError as e:
+            cf.logmessage("DatabaseError!")
             cf.logmessage(e)
-            c.close()
             raise
-        # coerce_float : need to ensure mobiles aren't screwed
-        c.close()
         
         # make all colunm headers lowercase
-        # if lowerCaseColumns: df.columns = [x.lower() for x in df.columns] # from https://stackoverflow.com/questions/19726029/how-can-i-make-pandas-dataframe-column-headers-all-lowercase
+        if lowerCaseColumns: df.columns = [x.lower() for x in df.columns] # from https://stackoverflow.com/questions/19726029/how-can-i-make-pandas-dataframe-column-headers-all-lowercase
         
         if output=='df':
-            if not len(df) and (not keepCols): return []
-            else: return df
+            result = df
+            if not len(df):
+                result = []
 
-        if not len(df): return []
-        if output == 'column':
-            return df.iloc[:,0].tolist() # .iloc[:,0] -> first column
+        elif (not len(df)): 
+            result = []
+        elif output == 'column':
+            result = df.iloc[:,0].tolist() # .iloc[:,0] -> first column
         elif output == 'list':
-            return df.to_dict(orient='records')
-        elif output == 'oneJson':
-            return df.to_dict(orient='records')[0]
+            result = df.to_dict(orient='records')
         else:
             # default - df
-            return df
+            result = df
+    else:
+        cf.logmessage('invalid output type')
+    
+    try:
+        threaded_postgreSQL_pool.putconn(ps_connection) # return threaded connnection back to pool
+    except DatabaseError as e:
+            cf.logmessage("DatabaseError when returning threaded connection back to pool")
+            cf.logmessage(e)
+    finally:
+        return result
 
 
 def execSQL(s1, noprint=False):
-    if not isinstance(s1,str):
-        cf.logmessage("query needs to be a string")
-        return False
-    if ';' in s1:
-        cf.logmessage("; not allowed")
-        return False
+    if not noprint: cf.logmessage(' '.join(s1.split()))
+    ps_connection = threaded_postgreSQL_pool.getconn()
+    ps_cursor = ps_connection.cursor()
+    ps_cursor.execute(s1)
+    ps_connection.commit()
 
-    # keeping auth check and some other queries out
-    # skipPrint = ['set token=', 'polyline6', 'STGeomFromText']
-    # if not any([(x in s1) for x in skipPrint]) : 
-    #     cf.logmessage("Executing SQL:",s1.strip().replace('\n',' '))
-    # else: 
-    #     cf.logmessage("Executing SQL: {}...".format(s1.strip().replace('\n',' ')[:20]))
-
-    global sqlEngine
-    try:
-        c = sqlEngine.connect()
-        res = c.execute(s1)
-        if not noprint: cf.logmessage(f"{res.rowcount} rows affected")
-        c.close()
-        return res.rowcount
-    except sqlalchemy.exc.IntegrityError as e:
-        cf.logmessage("This entry already exists, skipping.")
-        time.sleep(1)
-        # cf.logmessage(e)
-        return False
-    except:
-        cf.logmessage('WARNING: could not execute query.')
-        raise
-        return False
-
-
-##### brought in from Sourcing Workflow application
-def getColumnsList(tablename, engine):
-    statement1 = f"""
-    SELECT COLUMN_NAME
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_NAME = N'{tablename}'
-    """
-    # sql = db.text(statement1)
-    df = pd.read_sql_query(statement1,con=engine)
-    # return df['COLUMN_NAME'].str.lower().to_list()
-    return df['COLUMN_NAME'].to_list()
+    affected = ps_cursor.rowcount
+    ps_cursor.close()
+    threaded_postgreSQL_pool.putconn(ps_connection)
+    return affected
 
 
 def addRow(params,tablename):
     df = pd.DataFrame([params]) 
     return addTable(df, tablename) # heck
 
-def addTable(df, tablename, lowerCaseColumns=False):
-    global sqlEngine
-    c = sqlEngine.connect()
 
-    table_cols = getColumnsList(tablename,c)
-    if lowerCaseColumns:
-        df.columns = [x.lower() for x in df.columns] # make lowercase
-    sending_cols = [x for x in table_cols if x in df.columns]
-    discarded_cols = set(df.columns.to_list()) - set(table_cols)
-    if len(discarded_cols): cf.logmessage("Dropping {} cols from uploaded data as they're not in the DB: {}".format(len(discarded_cols),', '.join(discarded_cols)))
-    
-    # ensure only those values go to DB table that have columns there
-    # cf.logmessage("Adding {} rows into {} with these columns: {}".format(len(df), tablename, sending_cols))
-    global CHUNKSIZE
+def addTable(df, table):
+    """
+    From https://naysan.ca/2020/05/09/pandas-to-postgresql-using-psycopg2-bulk-insert-performance-benchmark/
+    Using psycopg2.extras.execute_values() to insert the dataframe
+    https://www.psycopg.org/docs/extras.html#fast-exec
+    """
+    # Create a list of tupples from the dataframe values
+    tuples = [tuple(x) for x in df.to_numpy()]
+    # Comma-separated dataframe columns
+    cols = ','.join(list(df.columns))
+    # SQL query to execute
+    query  = "INSERT INTO %s(%s) VALUES %%s" % (table, cols)
+    ps_connection = threaded_postgreSQL_pool.getconn()
+    cursor = ps_connection.cursor()
+    cf.logmessage(f"Adding {len(df)} rows to {table}")
     try:
-        df[sending_cols].to_sql(name=tablename, con=c, chunksize=CHUNKSIZE, if_exists='append', index=False )
-        c.close()
-    except sqlalchemy.exc.IntegrityError as e:
-        cf.logmessage(e)
+        extras.execute_values(cursor, query, tuples)
+        ps_connection.commit()
+    except (Exception, psycopg2.DatabaseError) as error:
+        cf.logmessage("Error: %s" % error)
+        ps_connection.rollback()
+        cursor.close()
+        threaded_postgreSQL_pool.putconn(ps_connection) # return threaded connnection back to pool
         return False
-    except:
-        c.close()
-        raise
-        return False
-    cf.logmessage(f"{len(df)} rows added to {tablename}")
+    cursor.close()
+    threaded_postgreSQL_pool.putconn(ps_connection) # return threaded connnection back to pool
     return True
-

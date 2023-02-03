@@ -1,5 +1,3 @@
-SQLAlchemy
-pymysql
 pandas
 fastapi
 uvicorn[standard]

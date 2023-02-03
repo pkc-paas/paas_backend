@@ -71,7 +71,7 @@ class loginRBody(BaseModel):
 @app.post("/API/login", tags=["users"])
 def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage(f"login POST api call")
-    s1 = f"select email, username, pwd, status from users where username='{r.username}'"
+    s1 = f"select user_id, email, username, role, pwd, verified from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
         raise HTTPException(status_code=401, detail="Invalid username")
@@ -84,20 +84,20 @@ def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     if not X_Forwarded_For: 
         X_Forwarded_For = ''
 
-    if row['status']:
-        if row['status'] not in ('APPROVED'):
-            raise HTTPException(status_code=403, detail="User is not approved yet")
+    if not row['verified']:
+        raise HTTPException(status_code=403, detail="User is not approved yet")
 
     cf.logmessage(f"user {row['username']} authenticated")
     token = secrets.token_urlsafe(25)
-    i1 = f"""insert into sessions (token, username, ip, created_on) values 
-    ('{token}','{row['username']}', '{X_Forwarded_For[:50]}', CURRENT_TIMESTAMP)
+    i1 = f"""insert into sessions (token, user_id, ip, created_on) values 
+    ('{token}',{row['user_id']}, '{X_Forwarded_For[:50]}', CURRENT_TIMESTAMP)
     """
     iCount = dbconnect.execSQL(i1)
     
     returnD = {
         "message": "Successfully logged in user",
         "token": token,
+        "role": row['role'],
         "email": row['email'],
         "username": row['username']
     }
