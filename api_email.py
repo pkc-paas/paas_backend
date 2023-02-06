@@ -14,7 +14,6 @@ from fastapi import HTTPException, Header, File, UploadFile, Form
 
 import commonfuncs as cf
 from paas_launch import app
-# from api_users import authenticate, findRole
 
 
 def makeAddress(emails):
@@ -56,9 +55,7 @@ def sendEmail(content, subject, recipients, cc=None, html=None):
         msg.add_alternative(f"<!DOCTYPE html><html><body>{html}</body></html>", subtype = 'html')
 
     cf.logmessage('to:',msg['To'])
-    # cf.logmessage('cc:',msg['Cc'])
-    # cf.logmessage('subject:',msg['Subject'])
-    # cf.logmessage(content)
+
     
     # login to server and send the actual email
     # try:    
@@ -68,22 +65,3 @@ def sendEmail(content, subject, recipients, cc=None, html=None):
     status = server.send_message(msg)
     server.close()
     return status
-    # except:
-    #     return {'exception':True}
-    
-
-
-# class emailTestReq(BaseModel):
-#     recipients: List[str]
-#     subject: str
-#     content: str
-#     cc: Optional[str] = None
-
-# @app.post("/API/emailTest", tags=["email"])
-# def emailTest(req: emailTestReq, x_access_key: Optional[str] = Header(None)):
-#     cf.logmessage("emailTest api call")
-#     username, role = authenticate(x_access_key, allowed_roles=['admin'])
-    
-#     status = sendEmail(req.content, req.subject, req.recipients, req.cc)
-#     cf.logmessage(f"Email status: {status}")
-#     return {'message':'success', 'status':status}

@@ -12,8 +12,9 @@ import dbconnect
 from api_email import sendEmail
 
 
-rolesList = ['admin','moderator','sponsor','saplings_admin','saplings_entry']
+rolesList = ['admin','moderator','sponsor','saplings_admin','saplings_entry', 'superadmin']
 EMAILS_UNIQUE = False
+reserved_users = ['nikhil_admin'] # these users cannot be deleted, nor role changed etc.
 
 def encrypt(password):
     salt = bcrypt.gensalt()
@@ -28,16 +29,16 @@ def decrypt(hash_string,pwd):
         return False
 
 
-def authenticate(token, allowed_roles=['admin']):
-    s1 = f"""select t1.username, t2.role
+def authenticate(token, allowed_roles=['admin'], include_username=False):
+    s1 = f"""select t1.user_id, t2.username, t2.role, t2.tenant_id
     from sessions as t1
     left join users as t2
-    on t1.username = t2.username
+    on t1.user_id = t2.user_id
     where t1.token = '{token}'
     """
     #s1 = f"select username, role from users where token='{token}'"
 
-    user = dbconnect.makeQuery(s1, output='oneJson', printit=False)
+    user = dbconnect.makeQuery(s1, output='oneJson', noprint=True)
     if not user:
         cf.logmessage(f"rejected")
         raise HTTPException(status_code=401, detail="Invalid login")
@@ -45,22 +46,25 @@ def authenticate(token, allowed_roles=['admin']):
         if user.get('role') not in allowed_roles:
             cf.logmessage(f"Insufficient permissions")
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-    return user['username'], user['role']
+    if not include_username:
+        return user['tenant_id'], user['user_id'], user['role']
+    else:
+        return user['tenant_id'], user['user_id'], user['role'], user['username']
 
 
 def findRole(token):
     # s1 = f"select username, role from users where token='{token}'"
-    s1 = f"""select t1.username, t2.role
+    s1 = f"""select t1.user_id, t2.role
     from sessions as t1
     left join users as t2
-    on t1.username = t2.username
+    on t1.user_id = t2.user_id
     where t1.token = '{token}'
     """
-    user = dbconnect.makeQuery(s1, output='oneJson', printit=False)
+    user = dbconnect.makeQuery(s1, output='oneJson', noprint=True)
     if not user:
         return None, None
     else:
-        return user['username'], user['role']
+        return user['user_id'], user['role']
 
 ########################
 
@@ -68,7 +72,7 @@ class loginRBody(BaseModel):
     username: str
     pw: str
 
-@app.post("/API/login", tags=["users"])
+@app.post("/API/login", tags=["login"])
 def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage(f"login POST api call")
     s1 = f"select user_id, email, username, role, pwd, verified from users where username='{r.username}'"
@@ -112,10 +116,10 @@ class changePwBody(BaseModel):
     oldpw: str
     newpw: str
 
-@app.post("/API/changepw", tags=["users"])
+@app.post("/API/changepw", tags=["login"])
 def changepw(r: changePwBody, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage(f"changepw POST api call")
-    s1 = f"select * from users where username='{r.username}'"
+    s1 = f"select pwd, user_id from users where username='{r.username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
         raise HTTPException(status_code=401, detail="Invalid username")
@@ -127,12 +131,12 @@ def changepw(r: changePwBody, X_Forwarded_For: Optional[str] = Header(None)):
     new_password = encrypt(r.newpw)
     u1 = f"""update users
     set pwd = '{new_password}'
-    where username='{r.username}'
+    where user_id ={row['user_id']}
     """
-    status = dbconnect.execSQL(u1)
+    status = dbconnect.execSQL(u1, noprint=True)
 
     # also clearing all existing sessions
-    d1 = f"delete from sessions where username = '{r.username}"
+    d1 = f"delete from sessions where user_id = {row['user_id']}"
     status2 = dbconnect.execSQL(d1)
 
     returnD = {
@@ -143,7 +147,7 @@ def changepw(r: changePwBody, X_Forwarded_For: Optional[str] = Header(None)):
 
 ########################
 
-@app.get("/API/logout", tags=["users"])
+@app.get("/API/logout", tags=["login"])
 def logout(x_access_key: Optional[str] = Header(None)):
     cf.logmessage("logout api call")
     
@@ -158,15 +162,16 @@ def logout(x_access_key: Optional[str] = Header(None)):
 
 ########################
 
-@app.get("/API/checkUser", tags=["users"])
+@app.get("/API/checkUser", tags=["login"])
 def checkUser(x_access_key: Optional[str] = Header(None)):
     cf.logmessage("checkUser api call")
     try:
-        username, role = authenticate(x_access_key, allowed_roles=[])
+        tenant, user_id, role, username = authenticate(x_access_key, allowed_roles=[], include_username=True)
+        # username, role = 
     except:
         username, role = None, None
     cf.logmessage(f"user: {username} role: {role}")
-    returnD = {"message":"", "username":username, "role":role }
+    returnD = {"message":"valid user", "username":username, "role":role }
     return returnD
 
 
@@ -178,23 +183,30 @@ class createUser_payload(BaseModel):
     role: str
     pwd: str
     email: str
-    fullname: Optional[str]
-    remarks: Optional[str]
+    fullname: Optional[str] = None
+    remarks: Optional[str] = None
+    tenant_id: Optional[int] = None
 
 @app.post("/API/createUser", tags=["users"])
 def createUser(req: createUser_payload, x_access_key: Optional[str] = Header(None), X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage("createUser api call")
 
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    tenant, user_id, role = authenticate(x_access_key, allowed_roles=['admin', 'superadmin'])
+    
+    if role == 'superadmin' and req.tenant_id:
+        # allow to override the tenant if it's a superadmin : ie, allow superadmins to add user account under any tenant
+        tenant = req.tenant_id
     
     s1 = f"select username from users where username = '{req.username}'"
     exist = dbconnect.makeQuery(s1, output="oneValue")
     if exist:
         raise HTTPException(status_code=406, detail="This username is already taken")
-        
+    
+    fullname = req.fullname if req.fullname else req.username
+
     hash_string = encrypt(req.pwd)
-    i1 = f"""insert into users (username, email, role, pwd, fullname, `status`, created_by, created_on) values
-    ('{req.username}','{req.email}','{req.role}','{hash_string}','{req.username}', 'APPROVED', '{username}',CURRENT_TIMESTAMP)
+    i1 = f"""insert into users (tenant_id, username, email, role, pwd, fullname, verified, created_by, created_on) values
+    ({tenant}, '{req.username}','{req.email}','{req.role}','{hash_string}','{fullname}', TRUE, {user_id}, CURRENT_TIMESTAMP)
     """
     # since admin is doing it, auto-approve
     
@@ -218,18 +230,27 @@ def createUser(req: createUser_payload, x_access_key: Optional[str] = Header(Non
 @app.get("/API/listUsers", tags=["users"])
 def listUsers( x_access_key: Optional[str] = Header(...)):
     cf.logmessage("listUsers api call")
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    # user_id, role = authenticate(
+    tenant, username, role = authenticate(x_access_key, allowed_roles=['admin','superadmin'])
 
-    s1 = f"""select username, email, role, fullname, remarks, status,
-    last_login, created_on, created_by, last_pw_change
-    from users
-    order by created_on desc
-    """
+    if role == 'superadmin':
+        s1 = f"""select user_id, tenant_id, username, email, role, fullname, remarks, verified,
+        last_login, created_on, created_by, last_pw_change, referral_code
+        from users
+        order by created_on desc
+        """
+    else:
+        s1 = f"""select user_id, username, email, role, fullname, remarks, verified,
+        last_login, created_on, created_by, last_pw_change, referral_code
+        from users
+        where tenant_id = {tenant}
+        order by created_on desc
+        """
     uList = dbconnect.makeQuery(s1, output='list')
     returnD = {'status':'success'}
-    returnD['data'] = uList
     returnD['count'] = len(uList)
-
+    returnD['data'] = uList
+    
     return returnD
 
 
@@ -237,10 +258,11 @@ def listUsers( x_access_key: Optional[str] = Header(...)):
 
 
 class signup_payload(BaseModel):
+    tenant_id: Optional[int] = 1
     username: str
     email: str
     pwd: str
-    role: str
+    role: Optional[str] = "saplings_entry"
     # phone: str
     fullname: str
     referral: Optional[str] 
@@ -252,51 +274,53 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
 
     # Validations
 
+    global rolesList
+    if req.role not in rolesList:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    
     # username should be unique
     c1 = f"select count(username) from users where username='{req.username}'"
     existing = dbconnect.makeQuery(c1)
     if existing != 0:
         raise HTTPException(status_code=406, detail="This username already exists in the system, please use another")
-
-    global rolesList
-    if req.role not in rolesList:
-        raise HTTPException(status_code=400, detail="Invalid role")
-
-
+    
+    # start registering
     iCols = []
     iVals = []
 
     # validation: check if same email already existing, if we are set to keep emails unique
     global EMAILS_UNIQUE
     if EMAILS_UNIQUE:
-        s2 = f"select count(email) from users where email = '{req.email}' and status in ('APPROVED','APPLIED')"
+        s2 = f"select count(email) from users where email = '{req.email}' and verified = TRUE"
         emailCount = dbconnect.makeQuery(s2, output='oneValue')
         if emailCount:
-            raise HTTPException(status_code=406, detail="This email is already registered")
-
-
+            raise HTTPException(status_code=406, detail="Sorry, another user account is already registered with this email")
 
     # check referral code, determine status based on that
-    status = 'APPLIED'
+    verified = 'FALSE'
     refCount = 0
     if req.referral:
         s1 = f"""SELECT count(*) FROM referral_codes 
         WHERE referral_code = '{req.referral}' 
+        and tenant_id = {req.tenant_id}
         and CURRENT_TIMESTAMP <= valid_upto
         """
         refCount = dbconnect.makeQuery(s1, output='oneValue')
 
         if refCount > 0:
             cf.logmessage("Referral code verified, fast-track!")
-            status = 'APPROVED'
+            verified = 'TRUE'
             iCols.append('referral_code')
             iVals.append(f"'{req.referral}'")
         else:
             cf.logmessage("Invalid referral code, error out")
             raise HTTPException(status_code=400, detail="Invalid referral code")
         
-    iCols.append('status')
-    iVals.append(f"'{status}'")
+    iCols.append('verified')
+    iVals.append(verified)
+
+    iCols.append('tenant_id')
+    iVals.append(f"{req.tenant_id}")
 
     iCols.append('username')
     iVals.append(f"'{req.username}'")
@@ -318,7 +342,7 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
     iVals.append(f"CURRENT_TIMESTAMP")
 
     iCols.append('created_by')
-    iVals.append(f"'SIGNUP'")
+    iVals.append(f"0")
 
     if not X_Forwarded_For:
         X_Forwarded_For = ''
@@ -333,7 +357,7 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
 
     returnD = {'status':'success'}
 
-    if status == 'APPROVED':
+    if verified == 'TRUE':
         returnD['auto'] = True
     else:
         returnD['auto'] = False
@@ -362,11 +386,11 @@ def usernameAvailable(username: str, X_Forwarded_For: Optional[str] = Header(Non
 
 ##########
 
-@app.get("/API/forgotPw_trigger", tags=["users"])
+@app.get("/API/forgotPw_trigger", tags=["login"])
 def forgotPw_trigger(username, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage("forgotPw_trigger api call")
     # check if valid username
-    s1 = f"select username, email from users where username='{username}'"
+    s1 = f"select user_id, username, email from users where username='{username}'"
     row = dbconnect.makeQuery(s1, output='oneJson')
 
     if not row:
@@ -380,8 +404,8 @@ def forgotPw_trigger(username, X_Forwarded_For: Optional[str] = Header(None)):
     if not X_Forwarded_For:
         X_Forwarded_For = ''
 
-    i1 = f"""insert into otps (txnid, otp, created_for, purpose, validity, ip) values (
-    '{txnid}', {otp}, '{username}', 'forgotPw', {validity}, '{X_Forwarded_For[:50]}'
+    i1 = f"""insert into otps (txnid, otp, purpose, user_id, validity, ip) values (
+    '{txnid}', {otp}, 'forgotPw', {row['user_id']}, {validity}, '{X_Forwarded_For[:50]}'
     )"""
     i1Count = dbconnect.execSQL(i1)
     if not i1Count:
@@ -413,7 +437,7 @@ class resetPw_payload(BaseModel):
     otp: int
     newpw: str
 
-@app.post("/resetPw", tags=["users"])
+@app.post("/resetPw", tags=["login"])
 def forgotPw_trigger(req: resetPw_payload, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage("resetPw api call")
     if not X_Forwarded_For:
@@ -422,35 +446,44 @@ def forgotPw_trigger(req: resetPw_payload, X_Forwarded_For: Optional[str] = Head
     s1 = f"""select t1.*, t2.email
     from otps as t1
     left join users as t2
-    on t1.created_for = t2.username
-    where t1.txnid='{req.txnid}'"""
+    on t1.user_id = t2.user_id
+    where ( DATE_PART('day',  now() at time zone 'utc' - t1.created_on) * 24 + 
+            DATE_PART('hour',  now() at time zone 'utc' - t1.created_on) * 60 +
+            DATE_PART('minute',  now() at time zone 'utc' - t1.created_on) )  <= t1.validity 
+    and t1.txnid='{req.txnid}'
+    and matched_on IS NULL
+    """
+    # http://www.sqlines.com/postgresql/how-to/datediff
+    # https://stackoverflow.com/a/44199984/4355695
     row = dbconnect.makeQuery(s1, output="oneJson")
 
+    # validation
     if not row:
-        raise HTTPException(status_code=400, detail=f"Invalid txnid")
+        raise HTTPException(status_code=400, detail=f"Invalid or expired txnid")
+    
+    if not row['email']:
+        raise HTTPException(status_code=400, detail=f"Invalid user")
+    
+    # authenticate OTP
     if req.otp != row['otp']:
         raise HTTPException(status_code=401, detail=f"Invalid otp")
     ## http status codes: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 
-    if not row['email']:
-        raise HTTPException(status_code=400, detail=f"Invalid user")
-
-    # don't allow if too late
-    # row['created_on'] is already in pandas timestamp format, can be used as datetime obj
-    tdiff = (datetime.datetime.utcnow() - row['created_on']).total_seconds()/60
-    if tdiff > row['validity']:
-        raise HTTPException(status_code=401, detail=f"Sorry, the OTP has expired. Please trigger again.")
-    
-    # ok all clear now. Validate new pw
     # to do - validation by chars etc
     
     new_password = encrypt(req.newpw)
     u1 = f"""update users 
     set pwd = '{new_password}',
     last_pw_change = CURRENT_DATE
-    where username = '{row['created_for']}'"""
-    u1Count = dbconnect.execSQL(u1)
+    where user_id = {row['user_id']}
+    """
+    u1Count = dbconnect.execSQL(u1, noprint=True)
 
+    # update in OTP table that this has been matched
+    u1 = f"""update otps
+    set matched_on = CURRENT_TIMESTAMP
+    where t1.txnid='{req.txnid}'
+    """
     # to do: formality: send another email
 
     return {'status':'success'}
@@ -464,14 +497,17 @@ class approveUsers_payload(BaseModel):
 @app.post("/API/approveUsers", tags=["users"])
 def listUsers(req: approveUsers_payload, x_access_key: Optional[str] = Header(...)):
     cf.logmessage("approveUsers api call")
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    # user_id, role = authenticate(
+    tenant, user_id, role = authenticate(x_access_key, allowed_roles=['admin','superadmin'])
 
     usersListSQL = cf.quoteNcomma(req.usersList)
     u1 = f"""update users
-    set status = 'APPROVED'
+    set verified = TRUE
     where username in ({usersListSQL})
-    and ( status = 'APPLIED'
-    or status is NULL) """
+    and verified = FALSE
+    """
+    if role != 'superadmin':
+        u1 += f""" and tenant_id = {tenant} """
 
     u1Count = dbconnect.execSQL(u1)
 
@@ -487,14 +523,20 @@ class revertUsers_payload(BaseModel):
 @app.post("/API/revertUsers", tags=["users"])
 def listUsers(req: revertUsers_payload, x_access_key: Optional[str] = Header(...)):
     cf.logmessage("revertUsers api call")
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    # user_id, role = authenticate(
+    tenant, user_id, role, username = authenticate(x_access_key, allowed_roles=['admin','superadmin'], include_username=True)
 
-    usersListSQL = cf.quoteNcomma(req.usersList)
+    global reserved_users
+    usersList1 = [x for x in req.usersList if x not in (reserved_users + [username]) ]
+    usersListSQL = cf.quoteNcomma(usersList1)
+
     u1 = f"""update users
-    set status = 'APPLIED'
+    set verified = FALSE
     where username in ({usersListSQL})
-    and ( status = 'APPROVED'
-    or status is NULL) """
+    and verified = TRUE
+    """
+    if role != 'superadmin':
+        u1 += f""" and tenant_id = {tenant} """
 
     u1Count = dbconnect.execSQL(u1)
 
@@ -510,19 +552,25 @@ class changeRole_payload(BaseModel):
 @app.post("/API/changeRole", tags=["users"])
 def changeRole(req: changeRole_payload, x_access_key: Optional[str] = Header(...)):
     cf.logmessage("changeRole api call")
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    # user_id, role = authenticate(
+    tenant, user_id, role = authenticate(x_access_key, allowed_roles=['admin','superadmin'])
 
     global rolesList
     if req.role not in rolesList:
         cf.logmessage("Invalid role")
         raise HTTPException(status_code=400, detail="Invalid role")
     
-    usersListSQL = cf.quoteNcomma(req.usersList)
+    global reserved_users
+    usersList1 = [x for x in req.usersList if x not in reserved_users ]
+    usersListSQL = cf.quoteNcomma(usersList1)
 
     u1 = f"""update users
     set role = '{req.role}'
     where username in ({usersListSQL})
     """
+    if role != 'superadmin':
+        u1 += f""" and tenant_id = {tenant} """
+
     u1Count = dbconnect.execSQL(u1)
 
     returnD =  {'status':'success', 'count':u1Count }
@@ -531,10 +579,10 @@ def changeRole(req: changeRole_payload, x_access_key: Optional[str] = Header(...
 #####
 
 @app.get("/API/getRoles", tags=["users"])
-def getRoles(x_access_key: Optional[str] = Header(...)):
+def getRoles():
     cf.logmessage("getRoles api call")
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
-
+    # user_id, role = authenticate(
+    # tenant, user_id, role = authenticate(x_access_key, allowed_roles=['admin','superadmin'])
     global rolesList
     returnD = {'status':'success', 'roles': rolesList}
     return returnD
@@ -548,10 +596,12 @@ class deleteUsers_payload(BaseModel):
 @app.post("/API/deleteUsers", tags=["users"])
 def listUsers(req: deleteUsers_payload, x_access_key: Optional[str] = Header(...)):
     cf.logmessage("deleteUsers api call")
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    # user_id, role = authenticate(
+    tenant, user_id, role, username = authenticate(x_access_key, allowed_roles=['admin','superadmin'], include_username=True)
 
     # validations
-    usersList1 = [x for x in req.usersList if x not in (username, 'nikhil_admin','admin1')]
+    global reserved_users
+    usersList1 = [x for x in req.usersList if x not in ( [username] + reserved_users )]
 
     if not len(usersList1):
         raise HTTPException(status_code=400, detail="No applicable users to delete")
@@ -559,12 +609,16 @@ def listUsers(req: deleteUsers_payload, x_access_key: Optional[str] = Header(...
     usersListSQL1 = cf.quoteNcomma(usersList1)
     
     # first fetch the users data
-    s1 = f"""select username, email, role, `status`, fullname 
+    s1 = f"""select username, email, role, verified, fullname 
     from users
     where username in ({usersListSQL1})
-    and `status` != 'APPROVED'
-    order by username
+    and verified = FALSE
     """
+    if role != 'superadmin':
+        u1 += f""" and tenant_id = {tenant} """
+    
+    u1 += """ order by username"""
+
     df1 = dbconnect.makeQuery(s1, output='df')
 
     if not len(df1):
@@ -580,4 +634,57 @@ def listUsers(req: deleteUsers_payload, x_access_key: Optional[str] = Header(...
     d1Count = dbconnect.execSQL(d1)
 
     returnD =  {'status':'success', 'count':d1Count }
+    return returnD
+
+
+##########################
+# superadmin apis for tenant mgmt etc
+
+@app.get("/API/tenants/list", tags=["tenants"])
+def getTenants():
+    cf.logmessage("getTenants api call")
+    
+    s1 = f"""select tenant_id, tenant, region,
+    ST_Y(geometry) as lat, ST_X(geometry) as lon
+    from tenants
+    """
+    tenantsArr = dbconnect.makeQuery(s1, output="list")
+    returnD = {'status':'success', 'tenants': tenantsArr}
+    return returnD
+
+
+class addTenant_payload(BaseModel):
+    tenant: str
+    region: str
+    lat: float
+    lon: float
+
+@app.post("/API/tenants/add", tags=["tenants"])
+def addTenant(req: addTenant_payload, x_access_key: Optional[str] = Header(...) ):
+    cf.logmessage("addTenant api call")
+    tenant, user_id, role = authenticate(x_access_key, allowed_roles=['superadmin'])
+
+    # check if already
+    s1 = f"""select count(tenant) from tenants
+    where tenant = '{req.tenant}'
+    and is_disabled = FALSE
+    """
+    c1 = dbconnect.makeQuery(s1, output="oneValue")
+    if c1:
+        raise HTTPException(status_code=400, detail="tenant name already taken")
+    
+    i1 = f"""insert into tenants (tenant, region, is_disabled, geometry) values
+    ('{req.tenant}', '{req.region}', FALSE, 
+    ST_GeomFromText('POINT({req.lon} {req.lat})', 4326 )
+    )
+    """
+    i1Count = dbconnect.execSQL(i1)
+
+    if not i1Count:
+        raise HTTPException(status_code=500, detail="Unable to create entry in DB, please contact Admin")
+
+    # get new tenant id
+    s2 = f""" select tenant_id from tenants where tenant = '{req.tenant}' """
+    tenant_id = dbconnect.makeQuery(s2, output="oneValue")
+    returnD = {'status':'success', 'tenant_id': tenant_id}
     return returnD

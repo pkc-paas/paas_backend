@@ -7,8 +7,15 @@ print(root)
 timeOffset = 5.5
 maxThreads = 8
 
-logFolder = os.path.join(root, 'persistent_data','logs')
-os.makedirs(logFolder, exist_ok=True)
+root = os.path.dirname(__file__)
+folders = {
+    'sapling_files': os.path.join(root, 'persistent_data', 'sapling_files'),
+    'sapling_thumbs': os.path.join(root, 'persistent_data', 'sapling_thumbs'),
+    'observation_files': os.path.join(root, 'persistent_data', 'observation_files'),
+    'observation_thumbs': os.path.join(root, 'persistent_data', 'observation_thumbs'),
+    'uploads': os.path.join(root, 'persistent_data', 'uploads'),
+    'logs': os.path.join(root, 'persistent_data','logs')
+}
 
 
 def logmessage( *content ):
@@ -17,9 +24,9 @@ def logmessage( *content ):
     line = ' '.join(str(x) for x in list(content)) # from https://stackoverflow.com/a/3590168/4355695
     print(line) # print to screen also
     filename = 'log.txt'
-    if root.startswith('/mnt/PERSONAL/'):
+    if root.startswith('/mnt/'):
         filename = 'local_log.txt'
-    with open(os.path.join(logFolder,filename), 'a') as f:
+    with open(os.path.join(folders['logs'],filename), 'a') as f:
         print(timestamp, line, file=f) # file=f argument at end writes to file. from https://stackoverflow.com/a/2918367/4355695
 
 def makeError(message):
@@ -57,6 +64,8 @@ def quoteNcomma(a):
         holder.append("'{}'".format(n))
     return ','.join(holder)
 
+def justComma(a):
+    return ','.join([str(x) for x in a])
 
 def keyedJson(df, key='trainNo'):
     arr = df.to_dict(orient='records')
@@ -121,4 +130,17 @@ def validateLL(lat, lon):
     if lon < lonLimits[0] or lon > lonLimits[1]: return False
     return True
 
-    
+def arraySQL(arr):
+    if not isinstance(arr, list):
+        arr = [arr]
+    quoted = [f"'{x}'" for x in arr]
+    return f"array[{','.join(quoted)}]"
+
+def checkLLchange(lat1, lon1, lat2, lon2):
+    # if either of latter lat-lon not existing at all, then directly update
+    if (not isinstance(lat2,(int, float))) or (not isinstance(lon2,(int, float))):
+        return True
+    # will round to 6 decimals, and return true if there's been a change in either lat or lon
+    latCheck = (round(lat1,6) != round(lat2,6))
+    lonCheck = (round(lon1,6) != round(lon2,6))
+    return (latCheck or lonCheck)

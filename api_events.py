@@ -78,7 +78,8 @@ def createEvent(
     cf.logmessage("createEvent api call")
 
     print(r)
-    username, role = authenticate(x_access_key, allowed_roles=['admin'])
+    # user_id, role = authenticate(
+    tenant, user_id, role = authenticate(x_access_key, allowed_roles=['admin'])
 
     returnD = {}
 

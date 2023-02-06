@@ -1,7 +1,7 @@
 # dbonnect.py
 
 import psycopg2, json, sys, os, time, datetime
-from psycopg2 import pool, IntegrityError, extras
+from psycopg2 import pool, IntegrityError, extras, errors
 import pandas as pd
 from pandas.io.sql import DatabaseError
 
@@ -24,7 +24,7 @@ assert threaded_postgreSQL_pool, "Could not create DB connection"
 
 cf.logmessage("DB Connected")
 
-def makeQuery(s1, output='df', lowerCaseColumns=False, fillna=True, engine=None, noprint=False):
+def makeQuery(s1, output='oneValue', lowerCaseColumns=False, fillna=True, engine=None, noprint=False):
     '''
     output choices:
     oneValue : ex: select count(*) from table1 (output will be only one value)
@@ -114,8 +114,13 @@ def execSQL(s1, noprint=False):
     if not noprint: cf.logmessage(' '.join(s1.split()))
     ps_connection = threaded_postgreSQL_pool.getconn()
     ps_cursor = ps_connection.cursor()
-    ps_cursor.execute(s1)
-    ps_connection.commit()
+    try:
+        ps_cursor.execute(s1)
+        ps_connection.commit()
+
+    except errors.UniqueViolation as e:
+        cf.logmessage(f"UniqueViolation! {e}")
+        return False
 
     affected = ps_cursor.rowcount
     ps_cursor.close()

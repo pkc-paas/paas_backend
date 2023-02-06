@@ -19,6 +19,7 @@ class sys_dbfunc_payload(BaseModel):
 def sys_dbfunc(req: sys_dbfunc_payload, x_access_key: Optional[str] = Header(None), X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage("sys_dbfunc api call")
 
+    # user_id, role = authenticate(
     username, role = authenticate(x_access_key, allowed_roles=['admin'])
     returnD = { }
 

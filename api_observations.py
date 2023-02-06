@@ -32,7 +32,8 @@ class viewObservations_payload(BaseModel):
 def viewObservations(req: viewObservations_payload):
     cf.logmessage("viewObservations api call")
     
-    # username, role = authenticate(x_access_key, allowed_roles=['admin','moderator'])
+    # # user_id, role = authenticate(
+    username, role = authenticate(x_access_key, allowed_roles=['admin','moderator'])
     
     if not len(req.saplingsList):
         raise HTTPException(status_code=400, detail="No inputs")
@@ -159,6 +160,7 @@ def postObservation(
     # ref: https://github.com/tiangolo/fastapi/issues/854#issuecomment-573965912 for optional form fields etc
     cf.logmessage("postObservation api call")
 
+    # user_id, role = authenticate(
     username, role = authenticate(x_access_key, allowed_roles=['admin','moderator','sponsor','saplings_admin','saplings_entry'])
     
     # validations:

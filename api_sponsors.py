@@ -15,7 +15,7 @@ from api_users import authenticate
 ##########################
 
 class singleReq(BaseModel):
-    sapling_id: str
+    sapling_id: int
     adopted_name: Optional[str] = None
     comments: Optional[str] = None
 
@@ -26,17 +26,18 @@ class adoptReq(BaseModel):
 def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
     cf.logmessage("requestAdoption api call")
 
-    username, role = authenticate(x_access_key, allowed_roles=['sponsor'])
+    # user_id, role = authenticate(
+    tenant, user_id, role = authenticate(x_access_key, allowed_roles=['sponsor'])
     
     requested_sapling_ids = set([x.sapling_id for x in r.data])
     cf.logmessage('requested_sapling_ids:', requested_sapling_ids)
     
-    saplingIdsSQL = cf.quoteNcomma(requested_sapling_ids)
-    s1 = f"""select t1.*, t2.status as adopted_status, t2.username
+    saplingIdsSQL = cf.justComma(requested_sapling_ids)
+    s1 = f"""select t1.*, t2.adoption_status, t2.user_id
     from saplings as t1
     left join adoptions as t2
-    on t1.id = t2.sapling_id
-    where t1.id in ({saplingIdsSQL})
+    on t1.sapling_id = t2.sapling_id
+    where t1.sapling_id in ({saplingIdsSQL})
     """
     df1 = dbconnect.makeQuery(s1, output='df', fillna=True)
     if not len(df1):
@@ -94,7 +95,7 @@ def requestAdoption(r: adoptReq, x_access_key: Optional[str] = Header(None)):
 ##############################
 
 class mySaplingsReq(BaseModel):
-    sponsor_username: Optional[str] = None
+    sponsor_username: Optional[int] = None
     observations: Optional[bool] = False
 
 @app.post("/API/mySaplings", tags=["saplings"])
@@ -103,7 +104,8 @@ def mySaplings(req: mySaplingsReq , x_access_key: Optional[str] = Header(None)):
     Get all saplings adopted by a user and optionally their observations
     """
     cf.logmessage("mySaplings api call")
-    username, role = authenticate(x_access_key, allowed_roles=['sponsor','admin','moderator'])
+    # user_id, role = authenticate(
+    tenant, user_id, role = authenticate(x_access_key, allowed_roles=['sponsor','admin','moderator'])
 
     # print("observations:",req.observations)
 
