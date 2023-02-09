@@ -193,6 +193,12 @@ def createUser(req: createUser_payload, x_access_key: Optional[str] = Header(Non
 
     tenant, user_id, role = authenticate(x_access_key, allowed_roles=['admin', 'superadmin'])
     
+    # validations
+
+    # don't allow admins to add superadmins
+    if role == 'admin' and req.role == 'superadmin':
+        raise HTTPException(status_code=401, detail="You can't add someone with superadmin role.")
+
     if role == 'superadmin' and req.tenant_id:
         # allow to override the tenant if it's a superadmin : ie, allow superadmins to add user account under any tenant
         tenant = req.tenant_id

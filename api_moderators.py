@@ -80,7 +80,7 @@ def viewAdoptionEntries(x_access_key: Optional[str] = Header(None)):
 #     decision: str
     
 class processAdoptionRequest_payload(BaseModel):
-    idsList: List[str]
+    idsList: List[int]
     action: str
 
 
@@ -98,12 +98,12 @@ def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Op
     # date1 = cf.getDate()
 
     # fetch adoption entries as per idsList
-    idsListSQL = cf.quoteNcomma(req.idsList)
+    idsListSQL = cf.justComma(req.idsList)
     s1 = f"""select t1.*, t2.name 
     from adoptions as t1
     left join saplings as t2
-    on t1.sapling_id = t2.id
-    where t1.id in ({idsListSQL})
+    on t1.sapling_id = t2.sapling_id
+    where t1.sapling_id in ({idsListSQL})
     and t1.tenant_id = {tenant}
     order by t1.application_date
     """
@@ -112,9 +112,9 @@ def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Op
     # check if same sapling requested multiple
     if req.action.lower() == 'approve':
         saplings = df1['sapling_id'].tolist()
-        # find dupes in a list. from https://www.iditect.com/guide/python/python_howto_find_the_duplicates_in_a_list.html
+        
+        # validation: find dupes in a list. from https://www.iditect.com/guide/python/python_howto_find_the_duplicates_in_a_list.html
         dupes = set([x for x in saplings if saplings.count(x) > 1])
-
         if len(dupes):
             namesList = []
             dupesSQL = cf.quoteNcomma(dupes)
@@ -142,8 +142,9 @@ def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Op
         return returnD
 
     elif req.action.lower() == 'reject':
-        u2 = f"""delete from adoptions
-        where id in ({idsListSQL})
+        u2 = f"""update adoptions
+        set adoption_status = 'rejected'
+        where adoption_id in ({idsListSQL})
         and adoption_status = 'requested'
         and tenant_id = {tenant}
         """
@@ -158,7 +159,7 @@ def processAdoptionRequest(req: processAdoptionRequest_payload, x_access_key: Op
         set adoption_status = 'requested',
         modified_on = CURRENT_TIMESTAMP,
         approval_date = NULL
-        where id in ({idsListSQL})
+        where adoption_id in ({idsListSQL})
         and adoption_status = 'approved'
         and tenant_id = {tenant}
         """

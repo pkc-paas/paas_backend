@@ -18,17 +18,18 @@ root = os.path.dirname(__file__)
 ####################
 
 @app.get("/API/speciesList", tags=["species"])
-def speciesList(moreCols:Optional[str]=None ):
+def speciesList(tenant:int, moreCols:Optional[str]=None ):
     cf.logmessage("speciesList api call")
     returnD = {'status':'success'}
 
-    colsList = ['id', 'local_name', 'botanical_name']
-    if moreCols:
+    colsList = ['species_id', 'local_name', 'botanical_name']
+    if moreCols == 'Y':
         colsList.extend(moreCols.split(','))
 
     # to do: validation, get rid of invalid column names and keep the valid ones
     
     s1 = f"""select {','.join(colsList)} from species
+    where tenant_id = {tenant}
     order by local_name
     """
     
