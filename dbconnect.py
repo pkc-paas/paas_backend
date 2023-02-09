@@ -10,7 +10,7 @@ import commonfuncs as cf
 # 2022-12-19: adopting different db connection way from https://github.com/DavidLacroix/postgis-mvt/blob/master/webapp/app.py
 DB_PARAMETERS = {
     'host': os.environ.get('DB_SERVER',''),
-    'port': int( os.environ.get('DB_PORT','') ),
+    'port': int( os.environ.get('DB_PORT','5432') ),
     'database': os.environ.get('DB_DATABASE',''),
     'user': os.environ.get('DB_USER',''),
     'password': os.environ.get('DB_PW',''),
