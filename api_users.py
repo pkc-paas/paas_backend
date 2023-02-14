@@ -79,6 +79,7 @@ def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     t1.tenant_id, t2.tenant 
     from users as t1
     left join tenants as t2 
+    on t1.tenant_id = t2.tenant_id
     where t1.username='{r.username}'"""
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
@@ -670,6 +671,7 @@ class addTenant_payload(BaseModel):
     region: str
     lat: float
     lon: float
+    admin_email: str = None
 
 @app.post("/API/tenants/add", tags=["tenants"])
 def addTenant(req: addTenant_payload, x_access_key: Optional[str] = Header(...) ):
@@ -699,4 +701,8 @@ def addTenant(req: addTenant_payload, x_access_key: Optional[str] = Header(...) 
     s2 = f""" select tenant_id from tenants where tenant = '{req.tenant}' """
     tenant_id = dbconnect.makeQuery(s2, output="oneValue")
     returnD = {'status':'success', 'tenant_id': tenant_id}
+
+    # additional: create admin account for that tenant; and pre-load species
+    
+
     return returnD
