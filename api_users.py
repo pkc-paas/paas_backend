@@ -75,7 +75,11 @@ class loginRBody(BaseModel):
 @app.post("/API/login", tags=["login"])
 def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     cf.logmessage(f"login POST api call")
-    s1 = f"select user_id, email, username, role, pwd, verified from users where username='{r.username}'"
+    s1 = f"""select t1.user_id, t1.email, t1.username, t1.role, t1.pwd, t1.verified, 
+    t1.tenant_id, t2.tenant 
+    from users as t1
+    left join tenants as t2 
+    where t1.username='{r.username}'"""
     row = dbconnect.makeQuery(s1, output='oneJson')
     if not row:
         raise HTTPException(status_code=401, detail="Invalid username")
@@ -96,14 +100,16 @@ def login(r: loginRBody, X_Forwarded_For: Optional[str] = Header(None)):
     i1 = f"""insert into sessions (token, user_id, ip, created_on) values 
     ('{token}',{row['user_id']}, '{X_Forwarded_For[:50]}', CURRENT_TIMESTAMP)
     """
-    iCount = dbconnect.execSQL(i1)
+    iCount = dbconnect.execSQL(i1, noprint=True)
     
     returnD = {
         "message": "Successfully logged in user",
         "token": token,
         "role": row['role'],
         "email": row['email'],
-        "username": row['username']
+        "username": row['username'],
+        "tenant_id": row['tenant_id'],
+        "tenant_name": row['tenant']
     }
 
     return returnD    
