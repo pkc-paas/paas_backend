@@ -103,11 +103,11 @@ def makeQuery(s1, output='oneValue', lowerCaseColumns=False, keepCols=True, fill
             return df
 
 
-def execSQL(s1, noprint=False):
+def execSQL(s1, noprint=False, multiStatements=False):
     if not isinstance(s1,str):
         cf.logmessage("query needs to be a string")
         return False
-    if ';' in s1:
+    if ';' in s1 and not multiStatements:
         cf.logmessage("; not allowed")
         return False
 
