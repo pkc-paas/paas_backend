@@ -294,7 +294,11 @@ def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
         else:
             cf.logmessage("Invalid referral code, error out")
             raise HTTPException(status_code=400, detail="Invalid referral code")
-        
+    
+    hash_string = encrypt(req.pwd)
+    iCols.append('pwd')
+    iVals.append(f"'{hash_string}'")
+
     iCols.append('status')
     iVals.append(f"'{status}'")
 
