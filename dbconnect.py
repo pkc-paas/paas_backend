@@ -1,11 +1,11 @@
 # dbconnect.py
 CHUNKSIZE = 10000
 
-import urllib.parse # urljoin
+# import urllib.parse # urljoin
 import sqlalchemy
 # requires pymysql so keep that installed
 import pandas as pd
-import os, json, time
+import os, time
 
 import commonfuncs as cf
 
@@ -60,21 +60,22 @@ def makeQuery(s1, output='oneValue', lowerCaseColumns=False, keepCols=True, fill
     global sqlEngine
     c = sqlEngine.connect()
     if output == 'oneValue':
-        result = c.execute(s1).fetchone()
+        result = c.execute(sqlalchemy.text(s1)).fetchone()
+        # need to enclose query in sqlalchemy.text() from pandas v2 onwards
         c.close()
         if not result: return None
         return result[0]
     elif output == 'oneRow':
-        result = c.execute(s1).fetchone()
+        result = c.execute(sqlalchemy.text(s1)).fetchone()
         c.close()
         return result
     elif output in ['df','list','oneJson','column']:
         
         try:
             if fillna:
-                df = pd.read_sql_query(s1, con=c, coerce_float=False).fillna('') 
+                df = pd.read_sql_query(sqlalchemy.text(s1), con=c, coerce_float=False).fillna('') 
             else:
-                df = pd.read_sql_query(s1, con=c, coerce_float=False)
+                df = pd.read_sql_query(sqlalchemy.text(s1), con=c, coerce_float=False)
         except sqlalchemy.exc.OperationalError as e:
             cf.logmessage(f"DB OperationalError for query")
             if not printit: cf.logmessage(' '.join(s1.strip().split()))
@@ -121,7 +122,8 @@ def execSQL(s1, noprint=False, multiStatements=False):
     global sqlEngine
     try:
         c = sqlEngine.connect()
-        res = c.execute(s1)
+        res = c.execute(sqlalchemy.text(s1))
+        # need to enclose query in sqlalchemy.text() from pandas v2 onwards
         if not noprint: cf.logmessage(f"{res.rowcount} rows affected")
         c.close()
         return res.rowcount

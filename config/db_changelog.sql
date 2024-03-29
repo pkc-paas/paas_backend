@@ -56,3 +56,4 @@ ALTER TABLE events ADD lon DECIMAL(9,6) NULL;
 
 -- done in local, server
 
+-- 2023-06-04

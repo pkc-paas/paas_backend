@@ -1,12 +1,12 @@
-FROM python:3.9
+FROM python:3.11.3
 
 WORKDIR /code
 
 # expose port number
 EXPOSE 5400
 
+RUN pip install --no-cache-dir --upgrade pip
 COPY ./requirements.txt /code/requirements.txt
-
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY . /code
