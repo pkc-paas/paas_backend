@@ -243,8 +243,8 @@ class signup_payload(BaseModel):
     role: str
     # phone: str
     fullname: str
-    referral: Optional[str] 
-    remarks: Optional[str]
+    referral: str = None 
+    remarks: str = None
 
 @app.post("/API/signup", tags=["users"])
 def signup(req: signup_payload, X_Forwarded_For: Optional[str] = Header(None)):
